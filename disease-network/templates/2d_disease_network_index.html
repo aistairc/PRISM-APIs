@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }}{% endblock %}
+
+{% block styles %}
+  {{ super() }}
+
+  <style>
+    body {
+        overflow: hidden;
+        margin: 0;
+    }
+
+    text {
+        font-family: sans-serif;
+        pointer-events: all;
+    }
+  </style>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script type="text/javascript" src="http://d3js.org/d3.v3.min.js"></script>
+  <script type="text/javascript">
+    const graphData = `{{ graph_data }}`;
+  </script>
+  <script type="text/javascript" src="{{ url_for(app_name + ".static", filename="2d_disease_network_script.js") }}"></script>
+{%- endblock %}
+
+{% block content %}
+{%- endblock %}

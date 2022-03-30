@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }}{% endblock %}
+
+{% block styles %}
+  <!-- Under Construction favicon -->
+  <link href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8AAAD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///+BQAAAP8Rtvv/Ebb7/wAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//7+GgAAAP8Rvf//AAAA/xG9//8Rvf//AAAA/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8Owv//DsL//w7C//8AAAD/DsL//w7C//8AAAD//f7+FwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8Lx/7/C8f+/wvH/v8AAAD/C8L1/wvH/v8Lx/7/C8f+/wAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8Iy/3/B6/X/wjL/f8JzP3/B8r8/wjL/f8EY3f/CMv9/wjL/f8Iy/3/AAAA/wAAAAAAAAAAAAAAAAAAAP8I0P7/CND+/wAAAP8I0P7/AAEB/wAAAP8AAAD/AAAA/wnb//8Hz/3/CND+/wjQ/v8AAAD/AAAAAAAAAAAAAAD/CND+/wjQ/v8AAAD/CNH//wjQ/f8Hz/3/AAAA/wAAAP8I0P7/B9L+/wjQ/v8I0P7/AAAA/wAAAAAAAAAAAAAAAAAAAP8JzP7/AAQF/wafwP8AAAD/Ccv8/wi65v8AAAD/Ccz+/wnM/v8JzP7/AAAA/wAAAAAAAAAAAAAAAAAAAAAAAAAAY2Jk/wrH/v8Lx/7/C8f+/wvH/v8Lx/7/C8f+/wvH/v86zv7/Y2Jk/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB8fXz/b9n//2/Z//9v2f//b9n//2/Z//9v2f//fH18/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/P//AZOSlP+S4/z/kuP8/5Lj/P+S4/z/k5KU//z+/g0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAq6ur/7jw/P+48Pz/q6ur/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADDw8P/w8PD/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//8AAP5/AAD8PwAA+B8AAPAPAADgBwAAwAMAAIABAACAAQAAwAMAAOAHAADwDwAA+B8AAPw/AAD+fwAA//8AAA==" rel="icon" type="image/x-icon" />
+  <link href="{{ url_for(app_name + ".static", filename="css/jquery-ui.css") }}" rel="stylesheet" type="text/css"/>
+  <link href="{{ url_for(app_name + ".static", filename="css/jquery-ui-redmond.css") }}" rel="stylesheet" type="text/css"/>
+  <link href="{{ url_for(app_name + ".static", filename="css/style-vis.css") }}" rel="stylesheet" type="text/css"/>
+  {{ super() }}
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script type="text/javascript">
+    const pageData = {{ page_data | tojson | safe }};
+  </script>
+  <script type="text/javascript" src="{{ url_for(app_name + ".static", filename="script.js") }}"></script>
+{%- endblock %}
+
+{% block content %}
+  <nav class="navbar navbar-dark fixed-top bg-dark">
+    <div class="navbar-brand">
+      {{ app_name }}
+    </div>
+  </nav>
+
+  <div id="main-container" class="container-fluid">
+    <main role="main" class="bd-content">
+      <p id="job-status">We are now processing your data, please wait for a while...</p>
+      <div id="job-progress" class="progress" style="height: 20px;">
+        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="0"></div>
+      </div>
+      <div id="results" class="card mt-4 d-none">
+        <h5 class="card-header">Results</h5>
+        <div class="card-body">
+          <p class="card-text">Your data has been processed, you can now access your disease network via these links:</p>
+          <p>2D disease network: <a id="disease-network-2d-url" href="#" target="_blank">Open in new tab</a></p>
+          <p>3D disease network: <a id="disease-network-3d-url" href="#" target="_blank">Open in new tab</a></p>
+        </div>
+      </div>
+      <div class="form-group d-flex flex-row mt-4">
+        <a type="button" class="btn btn-primary" href="{{url_for(app_name + ".index")}}">Back</a>
+      </div>
+    </main>
+  </div>
+
+  <footer class="footer font-small text-muted bg-dark">
+    <div class="footer-copyright text-center py-3">
+      <div>Version 0.1</div>
+      <div>
+        <a href="https://www.airc.aist.go.jp/en/kirt/">Knowledge and Information Research Team (KIRT)</a>
+      </div>
+      <div>
+        <a href="https://www.airc.aist.go.jp/en/">Artificial Intelligence Research Center (AIRC)</a>
+      </div>
+      <div>
+        <a href="https://www.aist.go.jp/index_en.html">National Institute of Advanced Industrial Science and Technology (AIST)</a>
+      </div>
+    </div>
+  </footer>
+{%- endblock %}

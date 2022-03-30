@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }}{% endblock %}
+
+{% block styles %}
+  <!-- Under Construction favicon -->
+  <link href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8AAAD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///+BQAAAP8Rtvv/Ebb7/wAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//7+GgAAAP8Rvf//AAAA/xG9//8Rvf//AAAA/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8Owv//DsL//w7C//8AAAD/DsL//w7C//8AAAD//f7+FwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8Lx/7/C8f+/wvH/v8AAAD/C8L1/wvH/v8Lx/7/C8f+/wAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8Iy/3/B6/X/wjL/f8JzP3/B8r8/wjL/f8EY3f/CMv9/wjL/f8Iy/3/AAAA/wAAAAAAAAAAAAAAAAAAAP8I0P7/CND+/wAAAP8I0P7/AAEB/wAAAP8AAAD/AAAA/wnb//8Hz/3/CND+/wjQ/v8AAAD/AAAAAAAAAAAAAAD/CND+/wjQ/v8AAAD/CNH//wjQ/f8Hz/3/AAAA/wAAAP8I0P7/B9L+/wjQ/v8I0P7/AAAA/wAAAAAAAAAAAAAAAAAAAP8JzP7/AAQF/wafwP8AAAD/Ccv8/wi65v8AAAD/Ccz+/wnM/v8JzP7/AAAA/wAAAAAAAAAAAAAAAAAAAAAAAAAAY2Jk/wrH/v8Lx/7/C8f+/wvH/v8Lx/7/C8f+/wvH/v86zv7/Y2Jk/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB8fXz/b9n//2/Z//9v2f//b9n//2/Z//9v2f//fH18/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/P//AZOSlP+S4/z/kuP8/5Lj/P+S4/z/k5KU//z+/g0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAq6ur/7jw/P+48Pz/q6ur/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADDw8P/w8PD/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//8AAP5/AAD8PwAA+B8AAPAPAADgBwAAwAMAAIABAACAAQAAwAMAAOAHAADwDwAA+B8AAPw/AAD+fwAA//8AAA==" rel="icon" type="image/x-icon" />
+  <link href="{{ url_for(app_name + ".static", filename="brat/jquery-ui.css") }}" rel="stylesheet" type="text/css"/>
+  <link href="{{ url_for(app_name + ".static", filename="brat/jquery-ui-redmond.css") }}" rel="stylesheet" type="text/css"/>
+  <link href="{{ url_for(app_name + ".static", filename="brat/style-vis.css") }}" rel="stylesheet" type="text/css"/>
+  {{ super() }}
+{% endblock %}
+
+{% block scripts %}
+  <script type="text/javascript" src="{{ url_for(app_name + ".static", filename="brat/head.load.min.js") }}"></script>
+  <script type="text/javascript">
+    const collData = {{ coll_data | tojson | safe }};
+    const samples = {{ samples | tojson | safe }};
+    const urls = {
+      annotate: {{ url_for(app_name + ".annotate") | tojson | safe }},
+      jquery: {{ url_for(app_name + ".static", filename="brat/jquery.min.js") | tojson | safe }},
+      libraries: [
+        {{ url_for(app_name + ".static", filename="brat/jquery-ui.min.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/jquery-ui.combobox.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/jquery.svg.min.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/jquery.svgdom.min.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/jquery.ba-bbq.min.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/jquery.json.min.js") | tojson | safe }},
+        // brat helpers
+        {{ url_for(app_name + ".static", filename="brat/util.js") | tojson | safe }},
+        // brat modules
+        {{ url_for(app_name + ".static", filename="brat/dispatcher.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/visualizer.js") | tojson | safe }},
+      ],
+    };
+  </script>
+  <script type="text/javascript" src="{{ url_for(app_name + ".static", filename="script.js") }}"></script>
+  {{ super() }}
+{%- endblock %}
+
+{% block content %}
+  <nav class="navbar navbar-dark fixed-top bg-dark">
+    <div class="navbar-brand">
+      {{ app_name }}
+    </div>
+
+    <nav class="navbar-nav d-flex flex-row">
+      <a id="download-txt" class="nav-link squished-text d-none" download="document.txt">.TXT</a>
+      <a id="download-ann" class="nav-link squished-text d-none" download="document.ann">.ANN</a>
+      <a id="back" class="nav-link mx-2" href="#">&#x2715;</a>
+      <a id="info" class="nav-link mx-2" href="#">&#x24D8;</a>
+      <a id="settings-opener" class="navbar-toggler show ml-3" href="#" aria-expanded="false" aria-controls="toggles">
+        <svg class="bi bi-gear" width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="transition: .5s ease">
+          <path fill-rule="evenodd" d="M8.837 1.626c-.246-.835-1.428-.835-1.674 0l-.094.319A1.873 1.873 0 0 1 4.377 3.06l-.292-.16c-.764-.415-1.6.42-1.184 1.185l.159.292a1.873 1.873 0 0 1-1.115 2.692l-.319.094c-.835.246-.835 1.428 0 1.674l.319.094a1.873 1.873 0 0 1 1.115 2.693l-.16.291c-.415.764.42 1.6 1.185 1.184l.292-.159a1.873 1.873 0 0 1 2.692 1.116l.094.318c.246.835 1.428.835 1.674 0l.094-.319a1.873 1.873 0 0 1 2.693-1.115l.291.16c.764.415 1.6-.42 1.184-1.185l-.159-.291a1.873 1.873 0 0 1 1.116-2.693l.318-.094c.835-.246.835-1.428 0-1.674l-.319-.094a1.873 1.873 0 0 1-1.115-2.692l.16-.292c.415-.764-.42-1.6-1.185-1.184l-.291.159A1.873 1.873 0 0 1 8.93 1.945l-.094-.319zm-2.633-.283c.527-1.79 3.065-1.79 3.592 0l.094.319a.873.873 0 0 0 1.255.52l.292-.16c1.64-.892 3.434.901 2.54 2.541l-.159.292a.873.873 0 0 0 .52 1.255l.319.094c1.79.527 1.79 3.065 0 3.592l-.319.094a.873.873 0 0 0-.52 1.255l.16.292c.893 1.64-.902 3.434-2.541 2.54l-.292-.159a.873.873 0 0 0-1.255.52l-.094.319c-.527 1.79-3.065 1.79-3.592 0l-.094-.319a.873.873 0 0 0-1.255-.52l-.292.16c-1.64.893-3.433-.902-2.54-2.541l.159-.292a.873.873 0 0 0-.52-1.255l-.319-.094c-1.79-.527-1.79-3.065 0-3.592l.319-.094a.873.873 0 0 0 .52-1.255l-.16-.292c-.892-1.64.902-3.433 2.541-2.54l.292.159a.873.873 0 0 0 1.255-.52l.094-.319z"/>
+          <path fill-rule="evenodd" d="M8 5.754a2.246 2.246 0 1 0 0 4.492 2.246 2.246 0 0 0 0-4.492zM4.754 8a3.246 3.246 0 1 1 6.492 0 3.246 3.246 0 0 1-6.492 0z"/>
+        </svg>
+      </a>
+    </nav>
+  </nav>
+
+  <div id="main-container" class="container-fluid">
+    <aside id="toggles" class="position-fixed container">
+      <form>
+        <label>
+          <input type="checkbox" id="all_toggles" checked/>All entities
+        </label>
+        <hr/>
+        <div id="toggles_list"></div>
+      </form>
+    </aside>
+
+    <main role="main" class="bd-content row">
+      <div id="commentpopup"></div>
+      <div id="info_text" class="d-none col-md-12 page">
+        <p>
+          Click the Annotate button to submit your text.
+        </p>
+
+        <p>
+          Click the Return button to return to the previous result.
+        </p>
+
+        <p>
+          Click the Clear button (or double-click the &#x2715; button) to clear the text.
+        </p>
+
+        <p>
+          Click the .TXT to download the input text.
+        </p>
+
+        <p>
+          Click the .ANN to download the brat output.
+        </p>
+
+        <p>
+          Click the &#x2715; button to return to editing.
+        </p>
+
+        <p>
+          Click the &#x24D8 button to show the usage. Click the &#x2715; or &#x24D8; buttons to dismiss this help screen.
+        </p>
+
+        <p>
+          Use the gear in the top-right corner to toggle which annotations are shown.
+        </p>
+
+        <p>
+          Contact: sohrab.mohammad@aist.go.jp
+        </p>
+
+        <!--
+        <p>
+          Click on an annotation to be able to interact with the entity linking results. Click elsewhere to resume normal operation.
+        </p>
+        -->
+      </div>
+      <div id="svg" class="col-md-12 page"></div>
+      <div id="spinner" class="col-md-12 unselectable d-none page">
+        <div class="w-100 my-5 d-flex justify-content-center">
+          <img src="{{ url_for(app_name + ".static", filename="brat/spinner.gif") }}"></img>
+        </div>
+      </div>
+
+      <form id="text_form" action="#" class="col-md-12 page">
+        <div class="form-group">
+          <textarea id="text" class="form-control" rows="20" placeholder="Enter text here."></textarea>
+        </div>
+
+        <div class="form-group d-flex flex-row">
+          <input id="btn_annotate" type="submit" value="Annotate" class="btn btn-primary waiting-ready" title="Submit your text to be annotated" disabled/>
+          <input id="btn_cancel" type="button" value="Return" class="btn btn-secondary" title="Show the previous render (without re-rendering)" disabled/>
+          <input id="btn_clear" type="button" value="Clear" class="btn btn-secondary" title="Clear the text"/>
+          <div class="flex-grow-1">&nbsp;</div>
+          <select id="drop_samples" class="form-control waiting-ready" disabled>
+            <option value="" selected>Load a sample</option>
+            {% for id in samples %}
+              <option value="{{id}}">{{id}}</option>
+            {% endfor %}
+          </select>
+          <input id="btn_input_file" type="file" accept="text/plain" class="waiting-ready" disabled/>
+        </div>
+        <div class="usage-guideline">
+          <p>
+            <b>Annotate</b>: submit your text. <b>Return</b>: show the previous result. <b>Clear</b>: clear the text.
+          </p>
+          <p>
+            &#x2715;: Back to the editing screen. &#x24D8;: Help.
+          </p>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <footer class="footer font-small text-muted bg-dark">
+    <div class="footer-copyright text-center py-3">
+      <div>Version 0.1</div>
+      <div>
+        <a href="https://www.airc.aist.go.jp/en/kirt/">Knowledge and Information Research Team (KIRT)</a>
+      </div>
+      <div>
+        <a href="https://www.airc.aist.go.jp/en/">Artificial Intelligence Research Center (AIRC)</a>
+      </div>
+      <div>
+        <a href="https://www.aist.go.jp/index_en.html">National Institute of Advanced Industrial Science and Technology (AIST)</a>
+      </div>
+    </div>
+  </footer>
+{%- endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }}{% endblock %}
+
+{% block styles %}
+  <!-- Under Construction favicon -->
+  <link href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8AAAD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///+BQAAAP8Rtvv/Ebb7/wAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//7+GgAAAP8Rvf//AAAA/xG9//8Rvf//AAAA/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8Owv//DsL//w7C//8AAAD/DsL//w7C//8AAAD//f7+FwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8Lx/7/C8f+/wvH/v8AAAD/C8L1/wvH/v8Lx/7/C8f+/wAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8Iy/3/B6/X/wjL/f8JzP3/B8r8/wjL/f8EY3f/CMv9/wjL/f8Iy/3/AAAA/wAAAAAAAAAAAAAAAAAAAP8I0P7/CND+/wAAAP8I0P7/AAEB/wAAAP8AAAD/AAAA/wnb//8Hz/3/CND+/wjQ/v8AAAD/AAAAAAAAAAAAAAD/CND+/wjQ/v8AAAD/CNH//wjQ/f8Hz/3/AAAA/wAAAP8I0P7/B9L+/wjQ/v8I0P7/AAAA/wAAAAAAAAAAAAAAAAAAAP8JzP7/AAQF/wafwP8AAAD/Ccv8/wi65v8AAAD/Ccz+/wnM/v8JzP7/AAAA/wAAAAAAAAAAAAAAAAAAAAAAAAAAY2Jk/wrH/v8Lx/7/C8f+/wvH/v8Lx/7/C8f+/wvH/v86zv7/Y2Jk/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB8fXz/b9n//2/Z//9v2f//b9n//2/Z//9v2f//fH18/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/P//AZOSlP+S4/z/kuP8/5Lj/P+S4/z/k5KU//z+/g0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAq6ur/7jw/P+48Pz/q6ur/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADDw8P/w8PD/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//8AAP5/AAD8PwAA+B8AAPAPAADgBwAAwAMAAIABAACAAQAAwAMAAOAHAADwDwAA+B8AAPw/AAD+fwAA//8AAA==" rel="icon" type="image/x-icon" />
+  <link href="{{ url_for(app_name + ".static", filename="css/jquery-ui.css") }}" rel="stylesheet" type="text/css"/>
+  <link href="{{ url_for(app_name + ".static", filename="css/jquery-ui-redmond.css") }}" rel="stylesheet" type="text/css"/>
+  <link href="{{ url_for(app_name + ".static", filename="css/style-vis.css") }}" rel="stylesheet" type="text/css"/>
+  {{ super() }}
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script type="text/javascript">
+    const samples = {{ samples | tojson | safe }};
+
+    $('#btn_clear').click(function() {
+      $('#text').val('').focus();
+    });
+
+    $('#drop_samples').change(function(e) {
+      const pmid = e.currentTarget.value;
+
+      if (pmid) {
+        $('#text').val(samples[pmid].body).focus();
+      }
+    });
+  </script>
+{%- endblock %}
+
+{% block content %}
+  <nav class="navbar navbar-dark fixed-top bg-dark">
+    <div class="navbar-brand">
+      {{ app_name }}
+    </div>
+  </nav>
+
+  <div id="main-container" class="container-fluid">
+    <main role="main" class="bd-content row">
+      <form method="POST" class="col-md-12 page" action="{{ url_for('.submit') }}">
+        <div class="form-group">
+          <textarea id="text" name="text" class="form-control" rows="15" placeholder="Enter text here" required></textarea>
+        </div>
+        <div class="form-group d-flex flex-row">
+          <input type="submit" value="Submit" class="btn btn-primary" title="Submit your text to be processed">
+          <input id="btn_clear" type="button" value="Clear" class="btn btn-secondary" title="Clear the text">
+          <div class="flex-grow-1">&nbsp;</div>
+          <select id="drop_samples" class="form-control">
+            <option value="" selected>Load a sample</option>
+            {% for id in samples %}
+              <option value="{{id}}">{{id}}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+
+      <form enctype="multipart/form-data" method="POST" class="col-md-12 page" action="{{ url_for('.submit') }}">
+        <div class="usage-guideline">
+          <p>Or you can also select and upload multiple plain text files</p>
+        </div>
+        <div class="form-group d-flex flex-row">
+          <input type="file" accept="text/plain" name="file" multiple>
+          <input type="submit" value="Upload" class="btn btn-primary" title="Upload all your plain text files to be processed">
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <footer class="footer font-small text-muted bg-dark">
+    <div class="footer-copyright text-center py-3">
+      <div>Version 0.1</div>
+      <div>
+        <a href="https://www.airc.aist.go.jp/en/kirt/">Knowledge and Information Research Team (KIRT)</a>
+      </div>
+      <div>
+        <a href="https://www.airc.aist.go.jp/en/">Artificial Intelligence Research Center (AIRC)</a>
+      </div>
+      <div>
+        <a href="https://www.aist.go.jp/index_en.html">National Institute of Advanced Industrial Science and Technology (AIST)</a>
+      </div>
+    </div>
+  </footer>
+{%- endblock %}
