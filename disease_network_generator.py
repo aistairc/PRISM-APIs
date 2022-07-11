@@ -195,6 +195,9 @@ def generate_graph_data(
     df = pd.DataFrame(
         all_events_for_3d, columns=["SRC_NAME", "SRC_TYPE", "DST_NAME", "DST_TYPE"]
     )
+    if not all_events_for_3d:
+        df.index = df.index.astype(int)
+
     graph_data_for_3d = disease_network_generator_for_3d.get_graph_data(df)
 
     file_utils.write_json(graph_data_for_2d, output_file_for_2d)

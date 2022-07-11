@@ -131,7 +131,7 @@ def mention_processor(api_input):
     all_unique_mentions = {}
     for item in api_input:
         """ In each row in the Statistics file needs at least two arguments """
-        if item['argument_type_2'] is not None:
+        if item.get('argument_type_2') is not None:
             #if item['argument_type_2'] is not None and item['event_type'] == 'Positive_regulation' or item['event_type'] == 'Regulation':
             #if item['argument_type_2'] is not None and item['event_type'] == 'Regulation':
             #if item['argument_type_2'] is not None and item['event_type'] == 'Positive_regulation':

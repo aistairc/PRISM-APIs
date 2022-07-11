@@ -47,8 +47,11 @@ def get_graph_data(df):
     node_index_mapping = dict(zip(node_df["NODE_NAME"], node_df.index))
 
     # Get unique edges and counts
+    chained_assignment = pd.options.mode.chained_assignment
+    pd.options.mode.chained_assignment = None
     df["SRC_NODE_INDEX"] = df["SRC_NAME"].map(node_index_mapping)
     df["DST_NODE_INDEX"] = df["DST_NAME"].map(node_index_mapping)
+    pd.options.mode.chained_assignment = chained_assignment
 
     edge_df = (
         df[["SRC_NODE_INDEX", "DST_NODE_INDEX"]]

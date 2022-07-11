@@ -159,12 +159,16 @@ def process_job(job_dir):
 
 
 def worker():
+    from traceback import print_exc
     while True:
-        job_id = queue.get()
+        try:
+            job_id = queue.get()
 
-        job_dir = JOB_DIR / job_id
+            job_dir = JOB_DIR / job_id
 
-        process_job(job_dir)
+            process_job(job_dir)
+        except Exception as x:
+            print_exc(x)
 
 
 def create_app():
