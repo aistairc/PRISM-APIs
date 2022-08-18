@@ -45,11 +45,16 @@
     </div>
 
     <nav class="navbar-nav d-flex flex-row">
-      <a id="download-txt" class="nav-link squished-text d-none" download="document.txt">.TXT</a>
-      <a id="download-ann" class="nav-link squished-text d-none" download="document.ann">.ANN</a>
-      <a id="back" class="nav-link mx-2" href="#">&#x2715;</a>
-      <a id="info" class="nav-link mx-2" href="#">&#x24D8;</a>
-      <a id="settings-opener" class="navbar-toggler show ml-3" href="#" aria-expanded="false" aria-controls="toggles">
+      <a id="download-txt" class="btn btn-secondary d-none" download="document.txt">
+          .txt
+      </a>
+      <a id="download-ann" class="btn btn-secondary d-none ml-2" download="document.ann">
+          .ann
+      </a>
+      <a id="back" class="btn btn-secondary ml-2" href="#">&#x2715;</a>
+      <a id="info" class="btn btn-secondary ml-4" href="#">&#xff1f;</a>
+      </a>
+      <a id="settings-opener" class="btn btn-secondary show ml-4" href="#" aria-expanded="false" aria-controls="toggles">
         <svg class="bi bi-gear" width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="transition: .5s ease">
           <path fill-rule="evenodd" d="M8.837 1.626c-.246-.835-1.428-.835-1.674 0l-.094.319A1.873 1.873 0 0 1 4.377 3.06l-.292-.16c-.764-.415-1.6.42-1.184 1.185l.159.292a1.873 1.873 0 0 1-1.115 2.692l-.319.094c-.835.246-.835 1.428 0 1.674l.319.094a1.873 1.873 0 0 1 1.115 2.693l-.16.291c-.415.764.42 1.6 1.185 1.184l.292-.159a1.873 1.873 0 0 1 2.692 1.116l.094.318c.246.835 1.428.835 1.674 0l.094-.319a1.873 1.873 0 0 1 2.693-1.115l.291.16c.764.415 1.6-.42 1.184-1.185l-.159-.291a1.873 1.873 0 0 1 1.116-2.693l.318-.094c.835-.246.835-1.428 0-1.674l-.319-.094a1.873 1.873 0 0 1-1.115-2.692l.16-.292c.415-.764-.42-1.6-1.185-1.184l-.291.159A1.873 1.873 0 0 1 8.93 1.945l-.094-.319zm-2.633-.283c.527-1.79 3.065-1.79 3.592 0l.094.319a.873.873 0 0 0 1.255.52l.292-.16c1.64-.892 3.434.901 2.54 2.541l-.159.292a.873.873 0 0 0 .52 1.255l.319.094c1.79.527 1.79 3.065 0 3.592l-.319.094a.873.873 0 0 0-.52 1.255l.16.292c.893 1.64-.902 3.434-2.541 2.54l-.292-.159a.873.873 0 0 0-1.255.52l-.094.319c-.527 1.79-3.065 1.79-3.592 0l-.094-.319a.873.873 0 0 0-1.255-.52l-.292.16c-1.64.893-3.433-.902-2.54-2.541l.159-.292a.873.873 0 0 0-.52-1.255l-.319-.094c-1.79-.527-1.79-3.065 0-3.592l.319-.094a.873.873 0 0 0 .52-1.255l-.16-.292c-.892-1.64.902-3.433 2.541-2.54l.292.159a.873.873 0 0 0 1.255-.52l.094-.319z"/>
           <path fill-rule="evenodd" d="M8 5.754a2.246 2.246 0 1 0 0 4.492 2.246 2.246 0 0 0 0-4.492zM4.754 8a3.246 3.246 0 1 1 6.492 0 3.246 3.246 0 0 1-6.492 0z"/>
@@ -137,14 +142,17 @@
               <option value="{{id}}">{{id}}</option>
             {% endfor %}
           </select>
-          <input id="btn_input_file" type="file" accept="text/plain" class="waiting-ready" disabled/>
+          <label for="btn_input_file" class="btn btn-secondary">
+            <span>Upload File</span>
+            <input id="btn_input_file" type="file" accept="text/plain" class="d-none"/>
+          </label>
         </div>
         <div class="usage-guideline">
           <p>
             <b>Annotate</b>: submit your text. <b>Return</b>: show the previous result. <b>Clear</b>: clear the text.
           </p>
           <p>
-            &#x2715;: Back to the editing screen. &#x24D8;: Help.
+            &#x2715;: Back to the editing screen. &#xff1f;: Help.
           </p>
         </div>
       </form>

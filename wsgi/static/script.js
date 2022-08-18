@@ -11,6 +11,7 @@
   let isMac = true;
   const modKey = isMac ? 'metaKey' : 'ctrlKey';
   const modKeyName = isMac ? 'Cmd' : 'Ctrl';
+  const appName = window.location.pathname.replace(/\/$/, '').split('/').pop();
 
   head.js(
     urls.jquery,
@@ -308,8 +309,16 @@
         currentEntities = docData.entities;
         currentNormalizations = {};
         docData.normalizations.forEach(norm => currentNormalizations[norm[0]] = norm)
-        $('#download-txt').removeClass('d-none').attr('href', datalink(docData.text));
-        $('#download-ann').removeClass('d-none').attr('href', datalink(docData.annfile));
+        const time = new Date().toISOString();
+        const name = appName + '-' + time.replace(/[-:]/g, '').replace('T', '_').replace(/\..*$/, '');
+        $('#download-txt').removeClass('d-none').attr({
+          href: datalink(docData.text),
+          download: name + '.txt',
+        });
+        $('#download-ann').removeClass('d-none').attr({
+          href: datalink(docData.annfile),
+          download: name + '.ann',
+        });
         showRender();
         renderCurrentData();
       });
