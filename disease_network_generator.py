@@ -184,7 +184,7 @@ def generate_status(doc_idx, num_docs, status, status_file):
     )
 
 
-def add_to_graph(c_entities, c_events, nodes, edges, nodelist):
+def add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist):
     def make_entity_node(entity):
         node_name = entity.canonical_name or f'"{entity.text}"'
         node_key = (node_name, entity.umls_id)
@@ -205,18 +205,29 @@ def add_to_graph(c_entities, c_events, nodes, edges, nodelist):
         return node["id"]
 
     def make_event_edge(ev, trigger, cause_no, theme_no):
-        edge_key = (trigger.type, cause_no, theme_no, ev.regulation)
+        edge_key = (cause_no, theme_no)
         edge = edges.get(edge_key)
         if not edge:
             edge = {
                 "source": cause_no,
                 "target": theme_no,
                 "type": trigger.type,
-                "regulation": ev.regulation,
-                "count": 0,
+                "instances": [],
             }
             edges[edge_key] = edge
-        edge["count"] += 1
+
+            # see if there is an edge going the other way
+            rev_edge_key = (theme_no, cause_no)
+            rev_edge = edges.get(rev_edge_key)
+            if rev_edge:
+                edge["bidir"] = 0
+                rev_edge["bidir"] = 1
+
+        edge["instances"].append({
+            "type": trigger.type, 
+            "regulation": ev.regulation,
+            "doc": doc_name,
+        })
 
     for ev in c_events.values():
         if not ev.regulation:
@@ -329,7 +340,7 @@ def generate_graph_data(
 
         # c_entities, c_events = collapse_regulation(entities, events)
         c_entities, c_events = collapse_regulation(entities, events)
-        add_to_graph(c_entities, c_events, nodes, edges, nodelist)
+        add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist)
 
         for ev in events.values():
             max_args = max(max_args, len(ev.args))
