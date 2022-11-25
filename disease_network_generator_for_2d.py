@@ -142,11 +142,12 @@ def mention_processor(api_input):
                 if item['argument_str_1'] not in all_unique_mentions:
                     all_unique_mentions[item['argument_str_1']] = {'PMID': [], 'entity': [], 'event_type': [],
                                                                    'entity_type': [], 'role_type': [], 'canonical': [],
-                                                                   'cui': [], 'target': {}}
+                                                                   'cui': [], 'target': {}, 'event_regulation': []}
                     all_unique_mentions[item['argument_str_1']]['PMID'].append(item['article_id'])
                     all_unique_mentions[item['argument_str_1']]['entity'].append(item['argument_str_1'])
                     all_unique_mentions[item['argument_str_1']]['entity_type'].append(item['argument_type_1'])
                     all_unique_mentions[item['argument_str_1']]['event_type'].append(item['event_type'])
+                    all_unique_mentions[item['argument_str_1']]['event_regulation'].append(item['event_regulation'])
                     if item['argument_role_type_1'][-1].isdigit():
                         all_unique_mentions[item['argument_str_1']]['role_type'].append(item['argument_role_type_1'][:-1])
                     else:
@@ -189,11 +190,12 @@ def mention_processor(api_input):
                 if item['argument_str_2'] not in all_unique_mentions:
                     all_unique_mentions[item['argument_str_2']] = {'PMID': [], 'entity': [], 'event_type': [], 'entity_type': [],
                                                                    'role_type': [], 'canonical': [], 'cui': [],
-                                                                   'target': {}}
+                                                                   'target': {}, 'event_regulation': []}
                     all_unique_mentions[item['argument_str_2']]['PMID'].append(item['article_id'])
                     all_unique_mentions[item['argument_str_2']]['entity'].append(item['argument_str_2'])
                     all_unique_mentions[item['argument_str_2']]['entity_type'].append(item['argument_type_2'])
                     all_unique_mentions[item['argument_str_2']]['event_type'].append(item['event_type'])
+                    all_unique_mentions[item['argument_str_2']]['event_regulation'].append(item['event_regulation'])
                     if item['argument_role_type_2'][-1].isdigit():
                         all_unique_mentions[item['argument_str_2']]['role_type'].append(item['argument_role_type_2'][:-1])
                     else:
@@ -238,11 +240,12 @@ def mention_processor(api_input):
                 if item['argument_str_3'] not in all_unique_mentions:
                     all_unique_mentions[item['argument_str_3']] = {'PMID': [], 'entity': [], 'event_type': [], 'entity_type': [],
                                                                    'role_type': [], 'canonical': [], 'cui': [],
-                                                                   'target': {}}
+                                                                   'target': {}, 'event_regulation': []}
                     all_unique_mentions[item['argument_str_3']]['PMID'].append(item['article_id'])
                     all_unique_mentions[item['argument_str_3']]['entity'].append(item['argument_str_2'])
                     all_unique_mentions[item['argument_str_3']]['entity_type'].append(item['argument_type_3'])
                     all_unique_mentions[item['argument_str_3']]['event_type'].append(item['event_type'])
+                    all_unique_mentions[item['argument_str_3']]['event_regulation'].append(item['event_regulation'])
                     if item['argument_role_type_3'][-1].isdigit():
                         all_unique_mentions[item['argument_str_3']]['role_type'].append(item['argument_role_type_3'][:-1])
                     else:
@@ -287,11 +290,12 @@ def mention_processor(api_input):
                 if item['argument_str_4'] not in all_unique_mentions:
                     all_unique_mentions[item['argument_str_4']] = {'PMID': [], 'entity': [], 'event_type': [], 'entity_type': [],
                                                                    'role_type': [], 'canonical': [], 'cui': [],
-                                                                   'target': {}}
+                                                                   'target': {}, 'event_regulation': []}
                     all_unique_mentions[item['argument_str_4']]['PMID'].append(item['article_id'])
                     all_unique_mentions[item['argument_str_4']]['entity'].append(item['argument_str_4'])
                     all_unique_mentions[item['argument_str_4']]['entity_type'].append(item['argument_type_4'])
                     all_unique_mentions[item['argument_str_4']]['event_type'].append(item['event_type'])
+                    all_unique_mentions[item['argument_str_4']]['event_regulation'].append(item['event_regulation'])
                     if item['argument_role_type_4'][-1].isdigit():
                         all_unique_mentions[item['argument_str_4']]['role_type'].append(item['argument_role_type_4'][:-1])
                     else:
@@ -333,6 +337,7 @@ def graph_generation(all_unique_mentions, cluster_group, mention_types, graph_di
             "entity_type": mention_types.index(value["entity_type"][0]),
             "entity_type_nominal": value["entity_type"][0],
             "event_type": value["event_type"][0],
+            "event_regulation": value["event_regulation"][0],
             "role_type": value["role_type"][0],
             "cui": value["cui"][0],
             "canonical": value["canonical"][0],

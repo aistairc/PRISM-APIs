@@ -4,6 +4,7 @@ from pathlib import Path
 from queue import Queue
 from tempfile import mkdtemp
 from threading import Thread
+import os
 
 from disease_network_generator import generate_graph_data, generate_status
 from flask import (
@@ -21,9 +22,10 @@ from werkzeug.utils import secure_filename
 
 from .config import samples
 
-JOB_DIR = Path("./.cache/disease-network").resolve()
+JOB_DIR = Path(os.environ.get('JOB_DIR', './.cache/disease-network')).resolve()
 
 STATUS_FILE_NAME = "status.json"
+OUTPUT_FILE_FOR_GRAPH = "graph.json"
 OUTPUT_FILE_FOR_2D_GRAPH = "2d_graph.json"
 OUTPUT_FILE_FOR_3D_GRAPH = "3d_disease_network.html"
 
@@ -88,6 +90,7 @@ def view(job_id):
         "view.html",
         page_data={
             "statusURL": url_for(".status", job_id=job_id),
+            "graphURL": url_for(".view_disease_network", job_id=job_id),
             "graph2DURL": url_for(".view_2d_disease_network", job_id=job_id),
             "graph3DURL": url_for(".view_3d_disease_network", job_id=job_id),
         },
@@ -103,7 +106,33 @@ def status(job_id):
     if not status_file_path.exists():
         return redirect(url_for(".index"))
 
-    return send_file(status_file_path, cache_timeout=-1)
+    return send_file(status_file_path, max_age=-1)
+
+
+@frontend.route("/graph_data/<job_id>")
+def fetch_graph_data(job_id):
+    job_dir = JOB_DIR / job_id
+    output_file_path_for_graph = job_dir / OUTPUT_FILE_FOR_GRAPH
+
+    if not output_file_path_for_graph.exists():
+        return redirect(url_for(".index"))
+
+    return send_file(output_file_path_for_graph, max_age=-1)
+
+
+@frontend.route("/graph/<job_id>")
+def view_disease_network(job_id):
+    job_dir = JOB_DIR / job_id
+    output_file_path_for_graph = job_dir / OUTPUT_FILE_FOR_GRAPH
+
+    if not output_file_path_for_graph.exists():
+        return redirect(url_for(".index"))
+
+    return render_template(
+        "graph.html",
+        app_name=frontend.name,
+        graph_data=url_for(".fetch_graph_data", job_id=job_id),
+    )
 
 
 @frontend.route("/2d_graph_data/<job_id>")
@@ -114,7 +143,7 @@ def fetch_2d_graph_data(job_id):
     if not output_file_path_for_2d_graph.exists():
         return redirect(url_for(".index"))
 
-    return send_file(output_file_path_for_2d_graph, cache_timeout=-1)
+    return send_file(output_file_path_for_2d_graph, max_age=-1)
 
 
 @frontend.route("/2d_disease_network/<job_id>")
@@ -140,10 +169,11 @@ def view_3d_disease_network(job_id):
     if not output_file_path_for_3d_graph.exists():
         return redirect(url_for(".index"))
 
-    return send_file(output_file_path_for_3d_graph, cache_timeout=-1)
+    return send_file(output_file_path_for_3d_graph, max_age=-1)
 
 
 def process_job(job_dir):
+    output_file_path_for_graph = job_dir / OUTPUT_FILE_FOR_GRAPH
     output_file_path_for_2d_graph = job_dir / OUTPUT_FILE_FOR_2D_GRAPH
     output_file_path_for_3d_graph = job_dir / OUTPUT_FILE_FOR_3D_GRAPH
     status_file_path = job_dir / STATUS_FILE_NAME
@@ -152,6 +182,7 @@ def process_job(job_dir):
 
     generate_graph_data(
         docs,
+        str(output_file_path_for_graph),
         str(output_file_path_for_2d_graph),
         str(output_file_path_for_3d_graph),
         status_file_path,

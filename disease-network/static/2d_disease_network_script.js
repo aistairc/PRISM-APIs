@@ -31,6 +31,8 @@ var force = d3.layout.force()
 
 var default_node_color = "#ccc";
 //var default_node_color = "rgb(3,190,100)";
+var default_positive_color = "#9f9";
+var default_negative_color = "#f99";
 var default_link_color = "#888";
 var nominal_base_node_size = 5;
 var nominal_text_size = 10;
@@ -166,12 +168,24 @@ d3.json(graphData, function(error, graph) {
                 .data(graph.nodes)
                 .enter().append("text")
                 .on("mouseover", function(d, i){
-                    d3.select(this).text(d.name)
+                    d3.select(this) // .text(d.name)
                           .on("click", function() { window.open(d.url); });
                 })
                 .attr("dy", ".35em")
                 .style("font-size", nominal_text_size + "px")
-                .text(function(d) { return '\u2002' + '\u2002' + d.name; });
+                .style("fill", function(d) {
+                  if (d.event_regulation === 1) return "#009900";
+                  else if (d.event_regulation === -1) return "#cc0000";
+                  else return "#000000";
+                })
+                //.text(function(d) { return '\u2002' + '\u2002' + d.name; });
+                .text(function(d) {
+                  let name = d.name;
+                  if (d.event_regulation) {
+                    name += " " + ((d.event_regulation === 1) ? "⊕" : "⊖");
+                  }
+                  return '\u2002' + '\u2002' + name;
+                });
 
     node.on("mouseover", function(d) {
         set_highlight(d);

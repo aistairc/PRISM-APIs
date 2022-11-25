@@ -53,11 +53,26 @@ def get_graph_data(df):
     df["DST_NODE_INDEX"] = df["DST_NAME"].map(node_index_mapping)
     pd.options.mode.chained_assignment = chained_assignment
 
-    edge_df = (
+    df_grouped = (
         df[["SRC_NODE_INDEX", "DST_NODE_INDEX"]]
         .groupby(["SRC_NODE_INDEX", "DST_NODE_INDEX"], as_index=False)
-        .size()
     )
+    print("=== ORIG DF")
+    import pickle
+    import base64
+    print(f"import base64; import pickle; df = pickle.loads(base64.a85decode({repr(base64.a85encode(pickle.dumps(df)))}))")
+    edge_df = df_grouped.size()
+    reg_series = []
+    for key, indices in df_grouped.groups.items():
+        print("-", key, ":", indices)
+        regs = df["REG"][indices].to_numpy()
+        if (regs[0] == regs).all():
+            reg_series.append(regs[0])
+        else:
+            reg_series.append(2)
+    edge_df["REG"] = reg_series
+    print("=== EDGE DF")
+    print(edge_df)
 
     # Construct directed graph
     graph = ig.Graph(directed=True)
@@ -150,9 +165,17 @@ def save_graph(graph, output_file):
         )
     )
 
+    REG_COLOR = {
+        1: "#33cc33",
+        0: "#495057",
+        -1: "#ff6666",
+        2: "#cccc66",
+    }
     # Create edges
     # This is a trick to make Plotly support different edge widths, but it could slow down the graph
     for group_name, group in graph["edges"].groupby(["size"]):
+        print(f"======== GROUP: {group_name}")
+        print(group)
         traces.append(
             go.Scatter3d(
                 x=group[["X_SRC", "X_DST", "DUMMY"]].to_numpy().flatten(),
@@ -164,7 +187,12 @@ def save_graph(graph, output_file):
                 showlegend=True,
                 name="Edge freq: " + str(group_name),
                 legendgroup="Edge freq: " + str(group_name),
-                line=dict(color="#495057", width=min(group_name + 1.5, 10)),
+                # line=dict(color="#495057", width=min(group_name + 1.5, 10)),
+                line=dict(color=[
+                    c
+                    for reg in group["REG"]
+                    for c in [REG_COLOR[reg], REG_COLOR[reg], 'yellow']
+                ], width=min(group_name + 1.5, 10)),
             )
         )
 
@@ -200,7 +228,8 @@ def save_graph(graph, output_file):
                 hoverinfo="text",
                 sizemode="absolute",
                 anchor="tip",
-                colorscale=[[0, "#495057"], [1, "#495057"]],
+                # colorscale=[[0, "#495057"], [1, "#495057"]],
+                colorscale=[[0, REG_COLOR[record["REG"]]], [1, REG_COLOR[record["REG"]]]],
                 sizeref=0.025,
                 showscale=False,
                 legendgroup="Edge freq: " + str(record["size"]),
