@@ -11,6 +11,7 @@ const highlight_color = "blue"
 const highlight_color_label = "black"
 const highlight_trans = 0.1
 const link_text_opacity = 0.5
+const nodeSize = 5;
 
 const bow_offset = 20
 const default_node_color = "#ccc"
@@ -129,14 +130,39 @@ function linkLabel(d) {
   if (reg) {
     name += " " + regMarkers[reg]
   }
+  name += ` [${d.id}]` // XXX GTDBEUG
   return name
 }
 
 
-const simulation = d3.layout.force()
-  .linkDistance(150)
-  .charge(-500)
-  .size([w,h])
+
+// const simulation = d3.layout.force()
+//   .linkDistance(150)
+//   .charge(-500)
+//   .size([w,h])
+// const simulation = d3.forceSimulation()
+//   .force("charge", d3.forceManyBody())
+//   .force("link", d3.forceLink().distance(150))
+//   .force("center", d3.forceCenter(w / 2, h / 2));
+
+const simulation = d3.forceSimulation()
+const linkForce =  d3.forceLink()
+  .id(d => d.id)
+  .distance(100)
+const chargeForce = d3.forceManyBody()
+const centerForce = d3.forceCenter(w / 2, h / 2)
+const collideForce = d3.forceCollide(30)
+simulation
+  .force("charge", chargeForce)
+  .force("center", centerForce)
+  .force("link", linkForce)
+  .force("collide", collideForce)
+
+setTimeout(() =>
+  //simulation.force("collide"
+  true,
+  500)
+
 
 
 const nominal_base_node_size = 5
@@ -148,7 +174,7 @@ const max_zoom = 10
 
 
 const svg = d3.select("body").append("svg").style("cursor","move")
-const zoom = d3.behavior.zoom()
+const zoom = d3.zoom()
   .scaleExtent([min_zoom, max_zoom])
 
 /* Initialize Group */
@@ -181,7 +207,7 @@ Object.entries(regulation_colors).forEach(([reg, color]) => {
   }
 })
 
-d3.json(graphData, function(error, graph) {
+d3.json(graphData).then(graph => {
   graph.nodes.forEach((d, i) => d.id = i)
   graph.links.forEach((d, i) => d.id = i)
   const maxCoEdges = Math.max(...graph.links.map(d => d.instances.length))
@@ -194,140 +220,130 @@ d3.json(graphData, function(error, graph) {
     return thicknessScale(d.instances.length)
   }
   function getMarker(d) {
-    const thickness = Math.round(getThickness(d))
     const regulationName = regulation_names[d.regulation]
-    return `url(#arrowhead-${regulationName}-${thickness})`
+    return `url(#arrowhead-${regulationName}-${d.thickness})`
   }
 
   const linkedByIndex = {}
-  graph.links.forEach(function(d) {
-    linkedByIndex[d.source + "," + d.target] = true
-  })
+  graph.links.forEach(d => linkedByIndex[d.source + "," + d.target] = true)
   function isConnected(a, b) {
-    return linkedByIndex[a.index + "," + b.index] || linkedByIndex[b.index + "," + a.index] || a.index == b.index
+    return a.index == b.index
+      || linkedByIndex[a.index + "," + b.index]
+      || linkedByIndex[b.index + "," + a.index]
   }
 
-  simulation
-    .nodes(graph.nodes)
-    .links(graph.links)
-    .start()
+  simulation.nodes(graph.nodes);
+  linkForce.links(graph.links);
 
+  let links = edgeG.selectAll("path")
+  let edgelabels = edgeLabelG.selectAll("text")
+  let nodes = nodeG.selectAll("circle")
+  let nodelabels = nodeLabelG.selectAll("text")
 
-  let links = edgeG.selectAll(".link")
-  let edgelabels = edgeLabelG.selectAll(".edgelabel")
-  let nodes = nodeG.selectAll(".node")
-  let nodelabels = nodeLabelG.selectAll(".nodelabel")
-  let circle
+  const drag = d3.drag()
+    .on("start", e => {
+      if (!e.active) simulation.alphaTarget(0.3).restart()
+      e.subject.fx = e.subject.x
+      e.subject.fy = e.subject.y
+    })
+    .on("drag", e => {
+      e.subject.fx = e.x
+      e.subject.fy = e.y
+    })
+    .on("end", e => {
+      exit_focus()
+      if (!e.active) simulation.alphaTarget(0)
+      e.subject.fx = null
+      e.subject.fy = null
+    })
 
   function update(graph) {
-    links = links
+    links = edgeG.selectAll("path")
       .data(graph.links, d => d.id)
+    links.exit().remove()
+    const linksEnter = links.enter()
+      .append("path")
+    linksEnter
+      .attr('id', d => `edgepath${d.id}`)
+      .attr('marker-end', getMarker)
+      .style("fill", "none")
+    links = links.merge(linksEnter)
     links
       .attr("d", linkBow)
-      .style("stroke-width", getThickness)
+      .style("stroke-width", d => d.thickness)
       .style("stroke", regulationColor)
-    links.exit().remove()
-    links.enter()
-      .append("path")
-      .attr('id', (d, i) => 'edgepath' + i)
-      .attr("d", linkBow)
-      .attr("class", "link")
-      .attr('marker-end', getMarker)
-      .style("stroke-width", getThickness)
-      .style("stroke", regulationColor)
-      .style("fill", "none")
 
-    /* Initialize Edge labels */
-    edgelabels = edgelabels
+    edgelabels = edgeLabelG.selectAll("text")
       .data(graph.links, d => d.id)
-    edgelabels
-      .attr('fill', regulationColor)
-      .attr('dy', d => -getThickness(d))
-      .select('textPath')
-      .text(linkLabel)
     edgelabels.exit().remove()
-    edgelabels.enter()
+    const edgelabelsEnter = edgelabels.enter()
       .append('text')
       .attr('class', 'edgelabel')
-      .attr('id', function (d, i) {return 'edgelabel' + i})
       .attr('font-size', '8')
-      .attr('fill', regulationColor)
       .attr('opacity', link_text_opacity)
       //.style("pointer-events", "all")
-      .attr('dy', d => -getThickness(d))
-
+    edgelabelsEnter
       .append('textPath')
-      .attr('xlink:href', function (d, i) {return '#edgepath' + i})
+      .attr('xlink:href', d => `#edgepath${d.id}`)
       .style("text-anchor", "middle")
       .style("pointer-events", "all")
       .attr("startOffset", "50%")
+    edgelabels = edgelabels.merge(edgelabelsEnter)
+      .attr('fill', regulationColor)
+      .attr('dy', d => -d.thickness)
+      .select('textPath')
       .text(linkLabel)
 
-    nodes = nodes
+    nodes = nodeG.selectAll("circle")
       .data(graph.nodes, d => d.id)
     nodes.exit().remove()
-    const node = nodes.enter().append("g")
-    node
-      .attr("class", "node")
-      .style("cursor", "grab")
-      .call(simulation.drag)
-      .append("title")
-      .text(function (d) {return d.id})
-
-    circle = node.append("path")
-      .attr("d",
-        d3.svg.symbol()
-        .size(d => d.size * 25)
-        .type(d => d.type_class)
-      )
+    const nodesEnter = nodes.enter()
+      .append("circle")
+    nodesEnter
+      .attr('r', nodeSize)
       .style(tocolor, nodeColor)
       .style("stroke-width", nominal_stroke)
       .style(towhite, "white")
+      .on("mouseover", (e, d) => set_highlight(d))
+      .on("mouseout", (e, d) => exit_highlight(d))
+      .on("mousedown", (e, d) => {
+        focus_node = d
+        set_focus(d)
+        if (!highlight_node) set_highlight(d)
+      })
+      .style("cursor", "grab")
+      .call(drag)
+      .append("title")
+      .text(d => d.id)
+    nodes = nodes.merge(nodesEnter)
 
-    nodelabels = nodelabels
+    nodelabels = nodeLabelG.selectAll("text")
       .data(graph.nodes, d => d.id)
     nodelabels.exit().remove()
-    nodelabels.enter()
+    const nodelabelsEnter = nodelabels.enter()
       .append("text")
-      .attr("class", "nodelabel")
-      .on("mouseover", function(d) {
+    nodelabelsEnter
+      .on("mouseover", (e, d) => {
         d3.select(this).style('fill', highlight_color)
       })
-      .on("mouseout", function(d) {
+      .on("mouseout", (e, d) => {
         d3.select(this).style('fill', default_node_label_color)
       })
-      .on("dblclick", function(d) {
+      .on("dblclick", (e, d) => {
         d3.select(this).style('fill', default_node_label_color)
         window.open(d.url)
       })
       .attr("dy", ".35em")
-      .attr("dx", function(d) {
-        return (d.size + 5) + "px"
-      })
+      .attr("dx", nodeSize)
       .style("font-size", nominal_text_size + "px")
       .style("cursor", "pointer")
       .style("fill", default_node_label_color)
       .text(d => d.name)
+    nodelabels = nodelabels.merge(nodelabelsEnter)
 
-    node
-      .on("mouseover", function(d) {
-        set_highlight(d)
-      })
-      .on("mousedown", function(d) {
-        d3.event.stopPropagation()
-        focus_node = d
-        set_focus(d)
-        if (highlight_node === null) set_highlight(d)
-      })
-      .on("mouseout", function(d) {
-        exit_highlight()
-      })
-
-    simulation
-      .nodes(graph.nodes)
-      .links(graph.links)
-
-    simulation.alpha(0.01)
+    simulation.nodes(graph.nodes);
+    simulation.force("link").links(graph.links);
+    simulation.alpha(0.05).restart(); // XXX
   }
 
   function makeFilter(items, selector, filterCb) {
@@ -344,7 +360,7 @@ d3.json(graphData, function(error, graph) {
     label
       .append('span')
       .text(d => ` ${d}`)
-    checkbox.on('change', function(d) {
+    checkbox.on('change', function(e, d) {
       const checked = this.checked;
       filter[d] = checked;
       filterCb()
@@ -376,9 +392,9 @@ d3.json(graphData, function(error, graph) {
         }
         const regulations = tally(newLink.instances.map(instance => instance.regulation))
         newLink.regulation = singleVal(regulations, 0, 2)
-        console.log(newLink.instances, regulations, newLink.regulation)
         const types = tally(newLink.instances.map(instance => instance.type))
         newLink.type = singleVal(types, "", "...")
+        newLink.thickness = getThickness(newLink)
       })
       const nodes = graph.nodes.filter(node => seenNodes.has(node.id))
       const newGraph = {
@@ -394,91 +410,69 @@ d3.json(graphData, function(error, graph) {
   const filter = makeFilters()
   filter()
 
-  d3.select(window).on("mouseup", function() {
-    if (focus_node!==null)  {
+  function exit_focus() {
+    if (focus_node)  {
       focus_node = null
-      if (highlight_trans<1)  {
-        circle.style("opacity", 1)
+      if (highlight_trans < 1)  {
+        nodes.style("opacity", 1)
         nodelabels.style("opacity", 1)
         links.style("opacity", 1)
         edgelabels.style("opacity", link_text_opacity)
       }
     }
 
-    if (highlight_node === null) exit_highlight()
-  })
+    if (highlight_node) exit_highlight()
+  }
 
-  function exit_highlight()   {
+  function exit_highlight() {
     highlight_node = null
-    if (focus_node===null)  {
-      svg.style("cursor","move")
-      if (highlight_color!="white")   {
-        circle.style(towhite, "white")
+    if (!focus_node)  {
+      svg.style("cursor", "move")
+      if (highlight_color != "white") {
+        nodes.style(towhite, "white")
         links.style("stroke", regulationColor)
-        edgelabels.style("fill", regulationColor)
+        edgelabels.style("opacity", link_text_opacity)
+        // edgelabels.style("fill", regulationColor)
       }
     }
   }
 
   function set_focus(d)   {
-    if (highlight_trans<1)  {
-      circle.style("opacity", function(o) {
-        return isConnected(d, o) ? 1 : highlight_trans
-      })
-      nodelabels.style("opacity", function(o) {
-        return isConnected(d, o) ? 1 : highlight_trans
-      })
-      links.style("opacity", function(o) {
-        return o.source.index == d.index || o.target.index == d.index ? 1 : highlight_trans
-      })
-      edgelabels.style("opacity", function(o) {
-        return o.source.index == d.index || o.target.index == d.index ? 1 : highlight_trans
-      })
+    if (highlight_trans < 1)  {
+      nodes.style("opacity", o => isConnected(d, o) ? 1 : highlight_trans)
+      nodelabels.style("opacity", o => isConnected(d, o) ? 1 : highlight_trans)
+      links.style("opacity", o => o.source.index == d.index || o.target.index == d.index ? 1 : link_text_opacity)
+      edgelabels.style("opacity", o => o.source.index == d.index || o.target.index == d.index ? 1 : highlight_trans)
     }
   }
 
-  function set_highlight(d)   {
-    svg.style("cursor","pointer")
-    if (focus_node!==null) d = focus_node
+  function set_highlight(d) {
+    svg.style("cursor", "pointer")
+    if (focus_node) d = focus_node
     highlight_node = d
-    if (highlight_color!=="white")   {
-      circle.style(towhite, function(o) {
-        return isConnected(d, o) ? highlight_color : "white"
-      })
-      links.style("stroke", function(o) {
-        return o.source.index == d.index || o.target.index == d.index ? highlight_color : regulationColor(o)
-      })
-      edgelabels.style("fill", function(o) {
-        return o.source.index == d.index || o.target.index == d.index ? highlight_color_label : regulationColor(o)
-      })
+    if (highlight_color !== "white") {
+      nodes.style(towhite, o => isConnected(d, o) ? highlight_color : "white")
+      links.style("stroke", o => o.source.index == d.index || o.target.index == d.index ? highlight_color : regulationColor(o))
+      edgelabels.style("opacity", o => o.source.index == d.index || o.target.index == d.index ? 1 : highlight_trans)
+      // edgelabels.style("fill", o => o.source.index == d.index || o.target.index == d.index ? highlight_color_label : regulationColor(o))
     }
   }
 
-  zoom.on("zoom", function() {
-    var base_radius = nominal_base_node_size
-    circle
-      .attr("d", d3.svg.symbol()
-      .size(function(d) { return d.size * 25 })
-      .type(function(d) { return d.type }))
+  zoom.on("zoom", e => topG.attr("transform", e.transform))
 
-    var text_size = nominal_text_size
-    nodelabels.style("font-size",text_size + "px")
 
-    topG.attr("transform",
-      `translate(${d3.event.translate}) scale(${d3.event.scale})`
-    )
-  })
-
-  svg.call(zoom).on("dblclick.zoom", null)
+  svg.call(zoom)
+    .on("dblclick.zoom", null)
+    .on("mouseup.zoom", null)
   resize()
   window.focus()
-  /* //Now we are giving the SVGs co-ordinates - the force layout is generating the co-ordinates which
-    this code is using to update the attributes of the SVG elements */
   
   simulation.on("tick", tick)
   function tick() {
-    nodes.attr("transform", d => `translate(${d.x},${d.y})`)
-    nodelabels.attr("transform", d => `translate(${d.x},${d.y})`)
+    const chargeForceStrength = chargeForce.strength()
+    if (chargeForceStrength > -500) chargeForce.strength(chargeForceStrength - 1)
+    nodes.attr("transform", d => `translate(${d.x.toFixed(4)},${d.y.toFixed(4)})`)
+    nodelabels.attr("transform", d => `translate(${d.x.toFixed(4)},${d.y.toFixed(4)})`)
     links.attr("d", linkBow)
   }
 
@@ -486,11 +480,12 @@ d3.json(graphData, function(error, graph) {
     var width = window.innerWidth, height = window.innerHeight
     svg.attr("width", width).attr("height", height)
 
-    const simSize = simulation.size()
-    simulation.size([
-      simSize[0]+(width-w)/zoom.scale(),
-      simSize[1]+(height-h)/zoom.scale()],
-    ).resume()
+    // const simSize = simulation.size()
+    // simulation.force("center").initialize(...)? // TODO
+    // simulation.size([
+    //   simSize[0]+(width-w)/zoom.scale(),
+    //   simSize[1]+(height-h)/zoom.scale()],
+    // ).resume()
     w = width
     h = height
   }

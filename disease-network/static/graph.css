@@ -48,8 +48,9 @@ svg text {
   display: flex;
   justify-content: center;
   align-content: center;
-  flex-direction: column;  
+  flex-direction: column;
   text-align: center;
+  user-select: none;
 }
 
 .sidebar-buttons > label {
@@ -98,6 +99,10 @@ html h2 {
 #tab-close-button {
   position: absolute;
   bottom: 0;
+}
+
+#tab-close-button nav {
+  border: none;
 }
 
 #tab-close:checked ~ nav {
