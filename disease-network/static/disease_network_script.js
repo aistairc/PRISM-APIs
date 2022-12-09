@@ -500,6 +500,8 @@ d3.json(graphData).then(graph => {
     const regTypes = ["Positive", "Negative"]
     const regFilter = makeFilter(regTypes, '#regulation-filters', filter)
     const regTypesRev = Object.fromEntries(regTypes.map((reg, i) => [1 - i * 2, reg]))
+    const docs = [...new Set(graph.nodes.flatMap(n => n.documents))].sort()
+    const docFilter = makeFilter(docs, '#document-filters', filter)
 
     function filter() {
       const links = []
