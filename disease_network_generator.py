@@ -197,7 +197,7 @@ def add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist):
                 "cui": entity.umls_id,
                 "url": entity.umls_id and "https://uts.nlm.nih.gov/uts/umls/searchResults?searchString=" + entity.umls_id,
                 "count": 0,
-                "size": 5,
+                "documents": [],
             }
             nodelist.append(node)
             nodes[node_key] = node
@@ -213,6 +213,7 @@ def add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist):
                 "target": theme_no,
                 "type": trigger.type,
                 "instances": [],
+                "documents": [],
             }
             edges[edge_key] = edge
 
@@ -228,7 +229,10 @@ def add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist):
             "regulation": ev.regulation,
             "doc": doc_name,
         })
+        return edge_key
 
+    node_no_set = set()
+    edge_key_set = set()
     for ev in c_events.values():
         if not ev.regulation:
             continue
@@ -255,7 +259,11 @@ def add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist):
 
         cause_no = make_entity_node(cause)
         theme_no = make_entity_node(theme)
-        make_event_edge(ev, trigger, cause_no, theme_no)
+        edge_key = make_event_edge(ev, trigger, cause_no, theme_no)
+
+        node_no_set.add(cause_no)
+        node_no_set.add(theme_no)
+        edge_key_set.add(edge_key)
 
     key = lambda e: sorted([e["source"], e["target"]])
     edgelist = sorted(edges.values(), key=key)
@@ -266,6 +274,11 @@ def add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist):
             e["link_count"] = link_count
             e["reverse_link"] = e["source"] > e["target"]
             e["link_no"] = link_no
+
+    for node_no in node_no_set:
+        nodelist[node_no]["documents"].append(doc_name)
+    for edge_key in edge_key_set:
+        edges[edge_key]["documents"].append(doc_name)
 
     return {
         "nodes": nodelist,
@@ -339,7 +352,21 @@ def generate_graph_data(
             entities[e_id] = entities[e_id]._replace(text=doc[span_start:span_end])
 
         # c_entities, c_events = collapse_regulation(entities, events)
+        # XXX GTDEBUG
+        from pprint import pprint
+        print("---ORIGINAL ENTITIES")
+        pprint(entities)
+        print("---ORIGINAL EVENTS")
+        pprint(events)
+
         c_entities, c_events = collapse_regulation(entities, events)
+        # XXX GTDEBUG
+        from pprint import pprint
+        print("---COLLAPSED ENTITIES")
+        pprint(c_entities)
+        print("---COLLAPSED EVENTS")
+        pprint(c_events)
+
         add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist)
 
         for ev in events.values():

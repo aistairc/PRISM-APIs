@@ -11,7 +11,9 @@ const highlight_color = "blue"
 const highlight_color_label = "black"
 const highlight_trans = 0.1
 const link_text_opacity = 0.5
-const nodeSize = 5;
+const nodeSize = 5
+const zoomInSpeed = 500
+const simAlpha = 0.1
 
 const bow_offset = 20
 const default_node_color = "#ccc"
@@ -24,6 +26,12 @@ const regulation_names = {
   0: "neutral",
   1: "positive",
   2: "mixed",
+}
+const nice_regulation_names = {
+  "-1": "Negative",
+  0: "Neutral",
+  1: "Positive",
+  2: "Mixed",
 }
 const regMarkers = {
   "-1": "⊖",
@@ -148,8 +156,9 @@ function linkLabel(d) {
 const simulation = d3.forceSimulation()
 const linkForce =  d3.forceLink()
   .id(d => d.id)
-  .distance(100)
+  //.distance(100)
 const chargeForce = d3.forceManyBody()
+  .strength(-20000)
 const centerForce = d3.forceCenter(w / 2, h / 2)
 const collideForce = d3.forceCollide(30)
 simulation
@@ -158,11 +167,12 @@ simulation
   .force("link", linkForce)
   .force("collide", collideForce)
 
-setTimeout(() =>
-  //simulation.force("collide"
-  true,
-  500)
+setTimeout(() => {
+  chargeForce.strength(10)
+  simulation.alpha(simAlpha).restart()
+}, 200)
 
+//setInterval(() => console.log(simulation.alpha()))
 
 
 const nominal_base_node_size = 5
@@ -182,8 +192,8 @@ const topG = svg.append("g").attr('id', 'top')
 const edgeG = topG.append("g").attr('id', 'edges')
 const edgeLabelG = topG.append("g").attr('id', 'edge-labels')
 const defG = topG.append("g").attr('id', 'defs')
-const nodeG = topG.append("g").attr('id', 'nodes')
 const nodeLabelG = topG.append("g").attr('id', 'node-labels')
+const nodeG = topG.append("g").attr('id', 'nodes')
 
 Object.entries(regulation_colors).forEach(([reg, color]) => {
   const regulationName = regulation_names[reg]
@@ -212,7 +222,7 @@ d3.json(graphData).then(graph => {
   graph.links.forEach((d, i) => d.id = i)
   const maxCoEdges = Math.max(...graph.links.map(d => d.instances.length))
   const thicknessScale = maxCoEdges > maxThickness
-    ? d3.scale.log().base(2) // XXX scaleSqrt?
+    ? d3.scaleLog().base(2) // XXX scaleSqrt?
       .domain([1, maxCoEdges])
       .range([1, maxThickness])
     : (x => x)
@@ -240,15 +250,22 @@ d3.json(graphData).then(graph => {
   let nodes = nodeG.selectAll("circle")
   let nodelabels = nodeLabelG.selectAll("text")
 
+  let startDragE = null
   const drag = d3.drag()
     .on("start", e => {
-      if (!e.active) simulation.alphaTarget(0.3).restart()
-      e.subject.fx = e.subject.x
-      e.subject.fy = e.subject.y
+      // avoid drag on mere click
+      startDragE = e
     })
     .on("drag", e => {
-      e.subject.fx = e.x
-      e.subject.fy = e.y
+      if (startDragE) {
+        if (!startDragE.active) simulation.alphaTarget(0.3).restart()
+        e.subject.fx = startDragE.subject.x
+        e.subject.fy = startDragE.subject.y
+        startDragE = null;
+      } else {
+        e.subject.fx = e.x
+        e.subject.fy = e.y
+      }
     })
     .on("end", e => {
       exit_focus()
@@ -288,6 +305,7 @@ d3.json(graphData).then(graph => {
       .style("text-anchor", "middle")
       .style("pointer-events", "all")
       .attr("startOffset", "50%")
+      .on("click", (e, d) => displayEdgeInfo(d))
     edgelabels = edgelabels.merge(edgelabelsEnter)
       .attr('fill', regulationColor)
       .attr('dy', d => -d.thickness)
@@ -311,6 +329,7 @@ d3.json(graphData).then(graph => {
         set_focus(d)
         if (!highlight_node) set_highlight(d)
       })
+      .on("click", (e, d) => displayNodeInfo(d))
       .style("cursor", "grab")
       .call(drag)
       .append("title")
@@ -329,6 +348,7 @@ d3.json(graphData).then(graph => {
       .on("mouseout", (e, d) => {
         d3.select(this).style('fill', default_node_label_color)
       })
+      .on("click", (e, d) => displayNodeInfo(d))
       .on("dblclick", (e, d) => {
         d3.select(this).style('fill', default_node_label_color)
         window.open(d.url)
@@ -345,6 +365,110 @@ d3.json(graphData).then(graph => {
     simulation.force("link").links(graph.links);
     simulation.alpha(0.05).restart(); // XXX
   }
+
+  function displayNodeInfo(node) {
+    d3.select('#tab-info')
+      .property('checked', true)
+    const info = d3.select('#tab-info ~ section').html('')
+    info.append('span')
+      .text('find_in_page')
+      .attr('class', 'material-symbols-outlined')
+      .style('float', 'right')
+      .style('cursor', 'pointer')
+      .on('click', (e, d) => {
+        const scale = 3.33
+        const transform = d3.zoomIdentity
+          .translate(
+            w / 2 - scale * node.x,
+            h / 2 - scale * node.y,
+          ).scale(scale)
+        svg.transition().duration(zoomInSpeed)
+          .call(zoom.transform, transform)
+      })
+    info.append('h2').text('Node Info')
+    info.append('h3').text(node.name)
+    info
+      .append('a')
+      .attr('href', node.url)
+      .attr('target', 'disease-network-cui')
+      .text(node.cui)
+    info.append('div').text(node.type)
+    const docFS = info.append('fieldset')
+    docFS.append('legend').text('Documents')
+    docFS.append('div').selectAll('div').data(node.documents).enter()
+      .append('div')
+      .append('a')
+      .attr('href', '#') // TODO
+      .text(d => d)
+    ![
+      [node.outgoing, "Inluences", "target"],
+      [node.incoming, "Influenced by", "source"],
+    ]
+      .filter(([item]) => item.length)
+      .forEach(([links, name, otherEnd]) => {
+        const fs = info.append('fieldset')
+        fs.append('legend').text(name)
+        fs.append('div')
+          .selectAll('div').data(links).enter()
+          .append('div')
+          .text(d => d[otherEnd].name)
+          .style('cursor', 'pointer')
+          .on('click', (e, d) => displayEdgeInfo(d))
+      })
+  }
+
+  function displayEdgeInfo(edge) {
+    d3.select('#tab-info')
+      .property('checked', true)
+    const info = d3.select('#tab-info ~ section').html('')
+    info.append('span')
+      .text('find_in_page')
+      .attr('class', 'material-symbols-outlined')
+      .style('float', 'right')
+      .style('cursor', 'pointer')
+      .on('click', (e, d) => {
+        const x = (edge.source.x + edge.target.x) / 2
+        const y = (edge.source.y + edge.target.y) / 2
+        const scale = 3.33
+        const transform = d3.zoomIdentity
+          .translate(
+            w / 2 - scale * x,
+            h / 2 - scale * y,
+          ).scale(scale)
+        svg.transition().duration(zoomInSpeed)
+          .call(zoom.transform, transform)
+      })
+    info.append('h2').text('Edge Info')
+    info.append('div').text(edge.source.name)
+      .style('cursor', 'pointer')
+      .on('click', (e, d) => displayNodeInfo(edge.source))
+    info.append('div').text('influences')
+    info.append('div').text(edge.target.name)
+      .style('cursor', 'pointer')
+      .on('click', (e, d) => displayNodeInfo(edge.target))
+    const classified = Object.fromEntries(
+      Object.keys(regulation_names).map(reg => [reg, []])
+    )
+    edge.instances.forEach(d => classified[d.regulation].push(d))
+    Object.entries(classified)
+      .filter(([reg, instances]) => instances.length)
+      .forEach(([reg, instances]) => {
+        const fs = info.append('fieldset')
+          .style('border-color', regulation_colors[reg])
+        if (!instances.length) return;
+        fs.append('legend')
+          .text(nice_regulation_names[reg])
+        const instanceDiv = fs.append('div').selectAll('div').data(instances).enter()
+          .append('div')
+        instanceDiv
+          .append('a')
+          .attr('href', '#') // TODO
+          .text(d => d.doc)
+        instanceDiv
+          .append('span')
+          .text(d => ' ' + d.type) // TODO
+      })
+    }
 
   function makeFilter(items, selector, filterCb) {
     const filter = Object.fromEntries(items.map(item => [item, true]))
@@ -380,8 +504,16 @@ d3.json(graphData).then(graph => {
     function filter() {
       const links = []
       const seenNodes = new Set()
+      const nodeMap = {}
+      graph.nodes.forEach(node =>
+        nodeMap[node.id] = { ...node, outgoing: [], incoming: [] }
+      )
       graph.links.forEach(link => {
-        const newLink = Object.assign({}, link)
+        const newLink = { ...link }
+        newLink.source = nodeMap[link.source.id]
+        newLink.target = nodeMap[link.target.id]
+        newLink.source.outgoing.push(newLink)
+        newLink.target.incoming.push(newLink)
         newLink.instances = link.instances.filter(instance =>
           relFilter[instance.type] && regFilter[regTypesRev[instance.regulation]]
         )
@@ -396,7 +528,7 @@ d3.json(graphData).then(graph => {
         newLink.type = singleVal(types, "", "...")
         newLink.thickness = getThickness(newLink)
       })
-      const nodes = graph.nodes.filter(node => seenNodes.has(node.id))
+      const nodes = Object.values(nodeMap).filter(node => seenNodes.has(node.id))
       const newGraph = {
         nodes,
         links,

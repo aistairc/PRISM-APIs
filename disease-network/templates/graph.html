@@ -3,16 +3,12 @@
 {% block title %}{{ app_name }}{% endblock %}
 
 {% block styles %}
-  {{ super() }}
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css" integrity="sha512-NmLkDIU1C/C88wi324HBc+S2kLhi08PN5GDeUVVVC/BVt/9Izdsc9SVeVfA1UZbY3sHUlDSyRXhCzHfr6hmPPw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css" integrity="sha512-NmLkDIU1C/C88wi324HBc+S2kLhi08PN5GDeUVVVC/BVt/9Izdsc9SVeVfA1UZbY3sHUlDSyRXhCzHfr6hmPPw==" crossorigin="anonymous" referrerpolicy="no-referrer" /> -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" />
   <link rel="stylesheet" href="{{ url_for(app_name + ".static", filename="graph.css") }}"/>
 {% endblock %}
 
 {% block scripts %}
-  {{ super() }}
-
   <!-- <script type="text/javascript" src="http://d3js.org/d3.v3.min.js"></script> -->
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script type="text/javascript">

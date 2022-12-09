@@ -50,11 +50,15 @@ svg text {
   align-content: center;
   flex-direction: column;
   text-align: center;
+}
+
+.sidebar-buttons label {
   user-select: none;
 }
 
 .sidebar-buttons > label {
   display: block;
+  margin: 0;
 }
 
 .tab-selector {
@@ -72,11 +76,12 @@ svg text {
   position: absolute;
   top: 0;
   left: var(--button-w);
-  width: 200px;
+  width: 230px;
   height: 100vh;
   background-color: var(--sidebar-bg-color-active);
   color: var(--sidebar-fg-color-active);
   display: none;
+  overflow: scroll;
 }
 
 .tab-selector:checked ~ .sidebar-tab {
@@ -92,6 +97,9 @@ html h2 {
   font-size: 20px;
 }
 
+.sidebar-fieldset {
+  width: 100%;
+}
 .sidebar-wrapper fieldset label {
   display: block;
 }
@@ -107,9 +115,4 @@ html h2 {
 
 #tab-close:checked ~ nav {
   display: none;
-}
-
-legend {
-  float: left;
-  width: 100%;
 }
