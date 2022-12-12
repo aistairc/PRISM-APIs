@@ -18,11 +18,35 @@ svg {
 
 body {
   overflow: hidden;
+  margin: 0;
 }
 
-svg text {
+#graphsvg text {
   font-family: sans-serif;
   /* pointer-events: all; */
+}
+
+main {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+}
+
+#graphsvg, #vis {
+  width: 100vw;
+}
+#graphsvg {
+  flex-grow: 1 1 auto;
+}
+#vis {
+  height: 200px;
+  overflow-y: scroll;
+  display: none;
+  box-shadow: 0 -5px 5px black;
+}
+#vis.show {
+  display: block;
 }
 
 
@@ -115,4 +139,9 @@ html h2 {
 
 #tab-close:checked ~ nav {
   display: none;
+}
+
+.doclink {
+  color: blue;
+  cursor: pointer;
 }

@@ -120,6 +120,17 @@ def fetch_graph_data(job_id):
     return send_file(output_file_path_for_graph, max_age=-1)
 
 
+@frontend.route("/doc_data/<job_id>/<doc_id>")
+def fetch_doc_data(job_id, doc_id):
+    job_dir = JOB_DIR / job_id
+    output_file_path_for_doc = job_dir / f"{doc_id}.json"
+
+    if not output_file_path_for_doc.exists():
+        return redirect(url_for(".index"))
+
+    return send_file(output_file_path_for_doc, max_age=-1)
+
+
 @frontend.route("/graph/<job_id>")
 def view_disease_network(job_id):
     job_dir = JOB_DIR / job_id
@@ -132,6 +143,7 @@ def view_disease_network(job_id):
         "graph.html",
         app_name=frontend.name,
         graph_data=url_for(".fetch_graph_data", job_id=job_id),
+        doc_data=url_for(".fetch_doc_data", job_id=job_id, doc_id=''),
     )
 
 

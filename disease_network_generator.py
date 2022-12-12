@@ -64,7 +64,7 @@ def annotate(task, doc):
         norms = [NORMALIZATION(*n) for n in norms]
         events = [EVENT(*e, Regulation.for_type(ev_entity_map[e[1]])) for e in events]
 
-        return entities, norms, cuis, events
+        return entities, norms, cuis, events, annotations
     except requests.HTTPError as ex:
         logger.exception(ex)
 
@@ -196,6 +196,7 @@ def add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist):
                 "type": entity.type,
                 "cui": entity.umls_id,
                 "url": entity.umls_id and "https://uts.nlm.nih.gov/uts/umls/searchResults?searchString=" + entity.umls_id,
+                "brat_ids": [[entity.id]],
                 "count": 0,
                 "documents": [],
             }
@@ -228,6 +229,7 @@ def add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist):
             "type": trigger.type, 
             "regulation": ev.regulation,
             "doc": doc_name,
+            "brat_ids": [[ev.trigger]], # add all involved IDs?
         })
         return edge_key
 
@@ -299,6 +301,7 @@ def generate_graph_data(
     nodes = {}
     edges = {}
     nodelist = []
+    doc_anns = {}
 
     for doc_idx, (doc_name, doc) in enumerate(docs, start=1):
         # el_entities, el_norms, el_cuis, _ = annotate("entity_linking", doc)
@@ -315,8 +318,9 @@ def generate_graph_data(
             # TODO make sure `annotate` detects regulation
 
         else:
-            el_entities, el_norms, el_cuis, _ = annotate("entity_linking", doc)
-            ev_entities, _, _, ev_events = annotate("event_extraction", doc)
+            el_entities, el_norms, el_cuis, _, _ = annotate("entity_linking", doc)
+            ev_entities, _, _, ev_events, anns = annotate("event_extraction", doc)
+            doc_anns[doc_name] = anns
 
         norm_map = {}
 
@@ -481,6 +485,10 @@ def generate_graph_data(
     file_utils.write_json(graph, output_file_for_graph)
     file_utils.write_json(graph_data_for_2d, output_file_for_2d)
     disease_network_generator_for_3d.save_graph(graph_data_for_3d, output_file_for_3d)
+
+    ann_dir = os.path.dirname(output_file_for_graph)
+    for doc_name, anns in doc_anns.items():
+        file_utils.write_json(anns, os.path.join(ann_dir, doc_name + ".json"))
 
     generate_status(len(docs), len(docs), True, status_file)
 

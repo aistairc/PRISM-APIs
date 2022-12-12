@@ -51,6 +51,52 @@ const node_colors = {
 }
 
 
+head.js(
+  urls.jquery,
+  () => head.js(...urls.libraries, onReady)
+);
+
+let dispatcher
+function onReady() {
+  Util.loadFonts = function() {};
+  window.Configuration = {
+    "abbrevsOn": true,
+    "textBackgrounds": "striped",
+    "visual": {
+      "margin": {
+        "x": 2,
+        "y": 1
+      },
+      "arcTextMargin": 1,
+      "boxSpacing": 1,
+      "curlyHeight": 4,
+      "arcSpacing": 9,
+      "arcStartHeight": 19
+    },
+    "svgWidth": "100%",
+    // "rapidModeOn": false,
+    // "confirmModeOn": true,
+    // "autorefreshOn": false,
+    "typeCollapseLimit": 30
+  };
+  $('.waiting-ready').prop('disabled', false);
+  dispatcher = new Dispatcher();
+  const visualizer = new Visualizer(dispatcher, 'brat');
+  dispatcher.post('init');
+  dispatcher
+    .on('resize', onResize)
+
+  let resizerTimeout = null;
+  function resizeFunction(evt) {
+    dispatcher.post('renderData');
+  }
+  function onResize(evt) {
+    if (evt.target === window) {
+      clearTimeout(resizerTimeout);
+      resizerTimeout = setTimeout(resizeFunction, 100); // TODO is 100ms okay?
+    }
+  }
+}
 
 // Adapted from https://stackoverflow.com/a/43825818/240443
 function dist(a, b){
@@ -102,11 +148,6 @@ function linkBow(d) {
   return calcBowPath([d.source.x, d.source.y], [d.target.x, d.target.y], o)
 }
 
-let w = window.innerWidth
-let h = window.innerHeight
-
-let focus_node = null, highlight_node = null
-
 
 function tally(items) {
   return items.reduce((a, e) => {
@@ -143,6 +184,21 @@ function linkLabel(d) {
 }
 
 
+const svg = d3.select("#graphsvg")
+  .style("cursor","move")
+  .on("resize", resizeHandler)
+let w
+let h
+
+function resizeHandler(e) {
+  const svgRect = svg.node().getBoundingClientRect()
+  w = svgRect.width
+  h = svgRect.height
+}
+resizeHandler()
+
+let focus_node = null, highlight_node = null
+
 
 // const simulation = d3.layout.force()
 //   .linkDistance(150)
@@ -172,7 +228,6 @@ setTimeout(() => {
   simulation.alpha(simAlpha).restart()
 }, 200)
 
-//setInterval(() => console.log(simulation.alpha()))
 
 
 const nominal_base_node_size = 5
@@ -183,7 +238,6 @@ const max_zoom = 10
 
 
 
-const svg = d3.select("body").append("svg").style("cursor","move")
 const zoom = d3.zoom()
   .scaleExtent([min_zoom, max_zoom])
 
@@ -218,6 +272,8 @@ Object.entries(regulation_colors).forEach(([reg, color]) => {
 })
 
 d3.json(graphData).then(graph => {
+  d3.select('#download-json')
+    .attr('href', graphData)
   graph.nodes.forEach((d, i) => d.id = i)
   graph.links.forEach((d, i) => d.id = i)
   const maxCoEdges = Math.max(...graph.links.map(d => d.instances.length))
@@ -394,12 +450,14 @@ d3.json(graphData).then(graph => {
       .text(node.cui)
     info.append('div').text(node.type)
     const docFS = info.append('fieldset')
-    docFS.append('legend').text('Documents')
-    docFS.append('div').selectAll('div').data(node.documents).enter()
+    docFS.append('legend').text('Instances')
+    docFS.append('div').selectAll('div').data(node.instances).enter()
       .append('div')
-      .append('a')
-      .attr('href', '#') // TODO
-      .text(d => d)
+      .classed('doclink', true)
+      .text(d => d => d.doc)
+      .on('click', (e, d) => {
+        displayDoc(d, d.brat_ids)
+      })
     ![
       [node.outgoing, "Inluences", "target"],
       [node.incoming, "Influenced by", "source"],
@@ -413,7 +471,7 @@ d3.json(graphData).then(graph => {
           .append('div')
           .text(d => d[otherEnd].name)
           .style('cursor', 'pointer')
-          .on('click', (e, d) => displayEdgeInfo(d))
+          .on('click', (e, d) => displayEdgeInfo(d.doc))
       })
   }
 
@@ -461,14 +519,41 @@ d3.json(graphData).then(graph => {
         const instanceDiv = fs.append('div').selectAll('div').data(instances).enter()
           .append('div')
         instanceDiv
-          .append('a')
-          .attr('href', '#') // TODO
+          .append('div')
+          .classed('doclink', true)
           .text(d => d.doc)
+          .on('click', (e, d) => displayDoc(d.doc, d.brat_ids))
         instanceDiv
           .append('span')
           .text(d => ' ' + d.type) // TODO
       })
     }
+
+  function displayDoc(doc, focus) {
+    console.log("DOC", doc)
+    console.log("FOC", focus)
+    d3.select('#vis').classed('show', true)
+    d3.json(docDataBase + doc).then(currentDocData => {
+      if (dispatcher) {
+        dispatcher.post('current', [
+          null,
+          null,
+          {
+            focus,
+          }
+        ])
+        dispatcher.post('collectionLoaded', [collData])
+        dispatcher.post(
+          'renderData',
+          [currentDocData],
+        )
+        const el = d3.select(`[data-span-id="${focus[0][0]}"], [data-node-id="${focus[0][0]}"]`).node()
+        if (el) {
+          el.scrollIntoView({ 'block': 'center' })
+        }
+      }
+    })
+  }
 
   function makeFilter(items, selector, filterCb) {
     const filter = Object.fromEntries(items.map(item => [item, true]))
@@ -517,7 +602,9 @@ d3.json(graphData).then(graph => {
         newLink.source.outgoing.push(newLink)
         newLink.target.incoming.push(newLink)
         newLink.instances = link.instances.filter(instance =>
-          relFilter[instance.type] && regFilter[regTypesRev[instance.regulation]]
+          relFilter[instance.type]
+          && regFilter[regTypesRev[instance.regulation]]
+          && docFilter[instance.doc]
         )
         if (newLink.instances.length) {
           links.push(newLink)
