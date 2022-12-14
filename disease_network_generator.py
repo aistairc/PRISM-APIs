@@ -16,9 +16,11 @@ from utils import file_utils
 
 
 
-REGULATION_EVENT_TYPES = {"Positive_regulation", "Negative_regulation"}
+ANTECEDENT_ROLES = ["Cause", "disorder"]
+CONSEQUENT_ROLE = "Theme"
 POSITIVE_REGULATION = "Positive_regulation"
 NEGATIVE_REGULATION = "Negative_regulation"
+REGULATION_EVENT_TYPES = { POSITIVE_REGULATION, NEGATIVE_REGULATION }
 DIRECT = "Regulation"
 class Regulation(IntEnum):
     UNREGULATED = 0
@@ -71,221 +73,167 @@ def annotate(task, doc):
     return [], [], {}, []
 
 
-def collapse_regulation(entities_nt, events_nt):
-    # make editable, otherwise this becomes very complicated
-    entities = { k: SimpleNamespace(**v._asdict()) for k, v in entities_nt.items() }
-    events = { k: SimpleNamespace(**v._asdict()) for k, v in events_nt.items() }
+class RegulationSquasher:
+    def __init__(self):
+        self.node_list = []
+        self.node_key_map = {}
+        self.link_list = []
+        self.link_key_map = {}
 
-    regulation_evids = {evid for evid, ev in events.items() if ev.regulation != Regulation.UNREGULATED}
-    subid_count = 0
+    def add(self, doc_name, entities, events):
+        node_map = {}
+        link_map = {}
+        entity_map = {}
+        event_map = {}
 
-    idmap = {}
-    maxids = {
-        'E': max(int(key[1:]) for key in events.keys()) if events else 0,
-        'T': max(int(key[1:]) for key in entities.keys()) if entities else 0,
-    }
+        # entities
+        for entity in entities.values():
+            entity_map[entity.id] = entity
+            node_key = entity.umls_id or f'"{entity.text}"'
+            node = self.node_key_map.get(node_key)
+            if not node:
+                node = {
+                    "id": len(self.node_list),
+                    "name": entity.canonical_name or f'"{entity.text}"',
+                    "instances": [],
+                    "cui": entity.umls_id,
+                    "url": entity.umls_id and "https://uts.nlm.nih.gov/uts/umls/searchResults?searchString=" + entity.umls_id,
+                }
+                self.node_list.append(node)
+                self.node_key_map[node_key] = node
+            node["instances"].append({
+                "doc": doc_name,
+                "brat_ids": [[entity.id]],
+                "type": entity.type,
+            })
 
+        # events
+        for event in events.values():
+            event_map[event.id] = event
 
-    def new_id(oldid, oldtype=None):
-        key = (oldid, oldtype)
-        newid = idmap.get(key)
-        if not newid:
-            kind = oldid[0]
-            maxids[kind] += 1
-            newid = f"{kind}{maxids[kind]}"
-        return newid
+        regulation_events = defaultdict(list)
+        reg_regulation_events = []
+        for event in events.values():
+            trigger = entity_map[event.trigger]
+            if trigger.type in REGULATION_EVENT_TYPES:
+                antecedents = [arg for arg in event.args if arg[0] in ANTECEDENT_ROLES]
+                for antecedent_role, antecedent_id in antecedents:
+                    antecedent = entity_map.get(antecedent_id)
+                    if not antecedent:
+                        # antecedent must be an entity
+                        continue
+                    antecedent_node_key = antecedent.umls_id or f'"{antecedent.text}"'
+                    antecedent_node = self.node_key_map[antecedent_node_key]
 
-    def replace_id(item, newid):
-        for ev in events.values():
-            if ev.trigger == item.id:
-                ev.trigger = newid
-            newargs = []
-            for arg in ev.args:
-                if arg[1] == item.id:
-                    arg = [arg[0], newid]
-                newargs.append(arg)
-            ev.args = newargs
+                    consequents = [arg for arg in event.args if arg[0] == CONSEQUENT_ROLE]
+                    for consequent_role, consequent_id in consequents:
+                        consequent = entity_map.get(consequent_id)
+                        if consequent:
+                            # consequent is an entity
+                            consequent_node_key = consequent.umls_id or f'"{consequent.text}"'
+                            consequent_node = self.node_key_map[consequent_node_key]
 
-    def calc_regulation(reg1, reg2):
-        return Regulation((reg1 or Regulation.POSITIVE) * (reg2 or Regulation.POSITIVE))
+                            brat_ids = [[event.id], [trigger.id], [antecedent_id], [consequent_id]]
+                            regulation_events[event.id].append([True, antecedent_node, consequent_node, event.regulation, DIRECT, brat_ids])
+                        else:
+                            # consequent is event
+                            consequent_event = event_map[consequent_id]
+                            consequent_type = entity_map[consequent_event.trigger].type
+                            sub_consequents = [arg for arg in consequent_event.args if arg[0] == CONSEQUENT_ROLE]
+                            if not sub_consequents:
+                                # must have consequents
+                                continue
+                            for sub_consequent_role, sub_consequent_id in sub_consequents:
+                                if consequent_type in REGULATION_EVENT_TYPES:
+                                    # consequent is a regulation event
+                                    # XXX add arc is as well? look up format
+                                    brat_ids = [[event.id], [trigger.id], [antecedent_id]] # consequent will be added later
+                                    regulation = Regulation(consequent_event.regulation * event.regulation)
+                                    event_descriptor = (True, event.id, antecedent_node, sub_consequent_id, regulation, brat_ids)
+                                    reg_regulation_events.append(event_descriptor)
+                                else:
+                                    # consequent is a non-regulation event
+                                    sub_consequent = entity_map.get(sub_consequent_id)
+                                    if not sub_consequent:
+                                        # sub consequent must be an entity
+                                        continue
+                                    # XXX add arc is as well? look up format
+                                    sub_consequent_node_key = sub_consequent.umls_id or f'"{sub_consequent.text}"'
+                                    sub_consequent_node = self.node_key_map[sub_consequent_node_key]
+                                    brat_ids = [[event.id], [trigger.id], [antecedent_id], [consequent_id], [sub_consequent_id]]
+                                    event_descriptor = [True, antecedent_node, sub_consequent_node, event.regulation, consequent_type, brat_ids]
+                                    regulation_events[event.id].append(event_descriptor)
 
-    solved = True
-    while solved:
-        solved = set()
-        for evid in regulation_evids:
-            ev = events[evid]
-            if ev.regulation is None:
-                # Solved and deleted
-                continue
-
-            trigger = entities[ev.trigger]
-            consequent_id = next((a[1] for a in events[evid].args if a[0] == "Theme"), None)
-            if not consequent_id:
-                # solved already
-                continue
-
-            # Is it a direct regulation?
-            consequent_en = entities.get(consequent_id)
-            if consequent_en:
-                trigger.type = DIRECT
-                solved.add(evid)
-                continue
-
-            consequent_ev = events.get(consequent_id)
-            # Regulation event must have a consequent event
-            if not consequent_ev:
-                continue
-
-            antecedent_arg = next((a for a in ev.args if a[0] in ['Cause', 'disorder']), None) # check error?
-            if antecedent_arg:
-                antecedent_ev = events.get(antecedent_arg[1], None)
-                if antecedent_ev and not antecedent_ev.regulation:
-                    # The only causes to a regulation event can be entities or other regulation events
-                    solved.add(evid)
+        changed = True
+        while reg_regulation_events and changed:
+            changed = False # to detect dependency cycles
+            for reg_event_ix in range(len(reg_regulation_events)):
+                event_descriptor = reg_regulation_events[reg_event_ix]
+                _, event_id, antecedent_node, consequent_id, regulation, brat_ids = event_descriptor
+                consequent_reg_events = regulation_events.get(consequent_id)
+                if not consequent_reg_events:
+                    # Not generated yet
                     continue
-            new_regulation = calc_regulation(ev.regulation, consequent_ev.regulation)
+                for consequent_reg_event in consequent_reg_events:
+                    changed = True
+                    _, _, sub_consequent_node, sub_regulation, sub_consequent_type, sub_brat_ids = consequent_reg_event
+                    new_regulation = Regulation(consequent_event.regulation * event.regulation)
+                    new_brat_ids = brat_ids + sub_brat_ids
+                    new_event_descriptor = [True, antecedent_node, sub_consequent_node, new_regulation, sub_consequent_type, new_brat_ids]
+                    regulation_events[event_id] = new_event_descriptor
+                    consequent_reg_event[0] = False
+                event_descriptor[0] = False
 
-            evtype = entities[consequent_ev.trigger].type
-            if evtype in { POSITIVE_REGULATION, NEGATIVE_REGULATION }:
-                # Don't combine these yet; wait till they get processed first
-                continue
+            # delete the processed reg_regulation_events
+            reg_regulation_events = [
+                event_descriptor for event_descriptor in reg_regulation_events if event_descriptor[0]
+            ]
 
-            newid = new_id(consequent_id)
-            new_args = [[*arg] for arg in consequent_ev.args if arg[0] not in ['Cause', 'disorder']]
-            if antecedent_arg:
-                new_args.append([*antecedent_arg])
-            new_consequent_ev = SimpleNamespace(**consequent_ev.__dict__)
-            new_consequent_ev.id = newid
-            new_consequent_ev.args = new_args
-            new_consequent_ev.regulation = new_regulation
-            events[newid] = new_consequent_ev
-            # Mark as "deleted"
-            ev.regulation = None
-            # XXX does not work with multiple references; should copy or something
-            replace_id(ev, newid)
 
-            solved.add(evid)
-            continue
+        for event_descriptors in regulation_events.values():
+            for event_descriptor in event_descriptors:
+                if not event_descriptor[0]:
+                    # ignore any reg_regulation_events remaining, as they are cyclic
+                    continue
 
-        regulation_evids -= solved
+                _, antecedent_node, consequent_node, regulation, consequent_type, brat_ids = event_descriptor
+                link_key = (antecedent_node["id"], consequent_node["id"])
+                link = self.link_key_map.get(link_key)
+                if not link:
+                    link = {
+                        "id": len(self.link_list),
+                        "source": antecedent_node["id"],
+                        "target": consequent_node["id"],
+                        "instances": [],
+                    }
+                    self.link_key_map[link_key] = link
+                    self.link_list.append(link)
 
-    for evid in list(events.keys()):
-        if entities[events[evid].trigger].type in [POSITIVE_REGULATION, NEGATIVE_REGULATION]:
-            del events[evid]
+                    # see if there is an edge going the other way
+                    rev_link_key = (consequent_node["id"], antecedent_node["id"])
+                    rev_link = self.link_key_map.get(rev_link_key)
+                    if rev_link:
+                        link["bidir"] = 0
+                        rev_link["bidir"] = 1
 
-    entities = { enid: ENTITY(**en.__dict__) for enid, en in entities.items() }
-    events = { evid: EVENT(**ev.__dict__) for evid, ev in events.items() }
-    return entities, events
+                link["instances"].append({
+                    "type": consequent_type,
+                    "regulation": regulation,
+                    "doc": doc_name,
+                    "brat_ids": brat_ids,
+                })
+
+    def graph_data(self):
+        return {
+            "nodes": self.node_list,
+            "links": self.link_list,
+        }
 
 
 def generate_status(doc_idx, num_docs, status, status_file):
     file_utils.write_json(
         {"current": doc_idx, "total": num_docs, "status": status}, status_file
     )
-
-
-def add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist):
-    def make_entity_node(entity):
-        node_name = entity.canonical_name or f'"{entity.text}"'
-        node_key = (node_name, entity.umls_id)
-        node = nodes.get(node_key)
-        if not node:
-            node = {
-                "id": len(nodelist),
-                "name": node_name,
-                "type": entity.type,
-                "cui": entity.umls_id,
-                "url": entity.umls_id and "https://uts.nlm.nih.gov/uts/umls/searchResults?searchString=" + entity.umls_id,
-                "brat_ids": [[entity.id]],
-                "count": 0,
-                "documents": [],
-            }
-            nodelist.append(node)
-            nodes[node_key] = node
-        node["count"] += 1
-        return node["id"]
-
-    def make_event_edge(ev, trigger, cause_no, theme_no):
-        edge_key = (cause_no, theme_no)
-        edge = edges.get(edge_key)
-        if not edge:
-            edge = {
-                "source": cause_no,
-                "target": theme_no,
-                "type": trigger.type,
-                "instances": [],
-                "documents": [],
-            }
-            edges[edge_key] = edge
-
-            # see if there is an edge going the other way
-            rev_edge_key = (theme_no, cause_no)
-            rev_edge = edges.get(rev_edge_key)
-            if rev_edge:
-                edge["bidir"] = 0
-                rev_edge["bidir"] = 1
-
-        edge["instances"].append({
-            "type": trigger.type, 
-            "regulation": ev.regulation,
-            "doc": doc_name,
-            "brat_ids": [[ev.trigger]], # add all involved IDs?
-        })
-        return edge_key
-
-    node_no_set = set()
-    edge_key_set = set()
-    for ev in c_events.values():
-        if not ev.regulation:
-            continue
-        cause_role, cause = next((a for a in ev.args if a[0] in {'Cause', 'disorder'}), (None, None))
-        if not cause:
-            continue
-        if cause in c_events:
-            continue
-        theme_role, theme = next((a for a in ev.args if a[0] == 'Theme'), (None, None))
-        if not theme:
-            continue
-        if theme in c_events:
-            continue
-
-        trigger = c_entities[ev.trigger]
-        cause = c_entities[cause]
-        theme = c_entities[theme]
-        cause_name = cause.canonical_name or f'"{cause.text}"'
-        theme_name = theme.canonical_name or f'"{theme.text}"'
-        # reg = {
-        #         Regulation.POSITIVE: 'POS',
-        #         Regulation.NEGATIVE: 'NEG',
-        # }.get(ev.regulation)
-
-        cause_no = make_entity_node(cause)
-        theme_no = make_entity_node(theme)
-        edge_key = make_event_edge(ev, trigger, cause_no, theme_no)
-
-        node_no_set.add(cause_no)
-        node_no_set.add(theme_no)
-        edge_key_set.add(edge_key)
-
-    key = lambda e: sorted([e["source"], e["target"]])
-    edgelist = sorted(edges.values(), key=key)
-    for pair, group in itertools.groupby(edgelist, key=key):
-        group = list(group)
-        link_count = len(group)
-        for link_no, e in enumerate(group):
-            e["link_count"] = link_count
-            e["reverse_link"] = e["source"] > e["target"]
-            e["link_no"] = link_no
-
-    for node_no in node_no_set:
-        nodelist[node_no]["documents"].append(doc_name)
-    for edge_key in edge_key_set:
-        edges[edge_key]["documents"].append(doc_name)
-
-    return {
-        "nodes": nodelist,
-        "links": list(edges.values()),
-    }
 
 
 def generate_graph_data(
@@ -297,11 +245,8 @@ def generate_graph_data(
 ):
     max_args = 0
     all_events = []
-
-    nodes = {}
-    edges = {}
-    nodelist = []
     doc_anns = {}
+    regulation_squasher = RegulationSquasher()
 
     for doc_idx, (doc_name, doc) in enumerate(docs, start=1):
         # el_entities, el_norms, el_cuis, _ = annotate("entity_linking", doc)
@@ -355,23 +300,7 @@ def generate_graph_data(
             entities[e_id] = entities[e_id]._replace(canonical_name=norm["name"])
             entities[e_id] = entities[e_id]._replace(text=doc[span_start:span_end])
 
-        # c_entities, c_events = collapse_regulation(entities, events)
-        # XXX GTDEBUG
-        from pprint import pprint
-        print("---ORIGINAL ENTITIES")
-        pprint(entities)
-        print("---ORIGINAL EVENTS")
-        pprint(events)
-
-        c_entities, c_events = collapse_regulation(entities, events)
-        # XXX GTDEBUG
-        from pprint import pprint
-        print("---COLLAPSED ENTITIES")
-        pprint(c_entities)
-        print("---COLLAPSED EVENTS")
-        pprint(c_events)
-
-        add_to_graph(doc_name, c_entities, c_events, nodes, edges, nodelist)
+        regulation_squasher.add(doc_name, entities, events)
 
         for ev in events.values():
             max_args = max(max_args, len(ev.args))
@@ -405,10 +334,7 @@ def generate_graph_data(
 
         generate_status(doc_idx, len(docs), False, status_file)
 
-    graph = {
-        "nodes": nodelist,
-        "links": list(edges.values()),
-    }
+    graph = regulation_squasher.graph_data()
     logger.info("Max args: {}", max_args)
 
     cols = [

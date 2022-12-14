@@ -454,12 +454,12 @@ d3.json(graphData).then(graph => {
     docFS.append('div').selectAll('div').data(node.instances).enter()
       .append('div')
       .classed('doclink', true)
-      .text(d => d => d.doc)
+      .text(d => d.doc)
       .on('click', (e, d) => {
-        displayDoc(d, d.brat_ids)
+        displayDoc(d.doc, d.brat_ids)
       })
     ![
-      [node.outgoing, "Inluences", "target"],
+      [node.outgoing, "Influences", "target"],
       [node.incoming, "Influenced by", "source"],
     ]
       .filter(([item]) => item.length)
@@ -530,8 +530,6 @@ d3.json(graphData).then(graph => {
     }
 
   function displayDoc(doc, focus) {
-    console.log("DOC", doc)
-    console.log("FOC", focus)
     d3.select('#vis').classed('show', true)
     d3.json(docDataBase + doc).then(currentDocData => {
       if (dispatcher) {
@@ -549,7 +547,8 @@ d3.json(graphData).then(graph => {
         )
         const el = d3.select(`[data-span-id="${focus[0][0]}"], [data-node-id="${focus[0][0]}"]`).node()
         if (el) {
-          el.scrollIntoView({ 'block': 'center' })
+          // XXX after layout is fixed
+          // el.scrollIntoView({ 'block': 'center' })
         }
       }
     })
@@ -585,7 +584,9 @@ d3.json(graphData).then(graph => {
     const regTypes = ["Positive", "Negative"]
     const regFilter = makeFilter(regTypes, '#regulation-filters', filter)
     const regTypesRev = Object.fromEntries(regTypes.map((reg, i) => [1 - i * 2, reg]))
-    const docs = [...new Set(graph.nodes.flatMap(n => n.documents))].sort()
+    const docs = [...new Set(graph.links.flatMap(link =>
+      link.instances.map(instance => instance.doc)
+    ))].sort()
     const docFilter = makeFilter(docs, '#document-filters', filter)
 
     function filter() {
@@ -618,6 +619,13 @@ d3.json(graphData).then(graph => {
         newLink.thickness = getThickness(newLink)
       })
       const nodes = Object.values(nodeMap).filter(node => seenNodes.has(node.id))
+      nodes.forEach(node => {
+        node.instances = node.instances.filter(instance =>
+          docFilter[instance.doc]
+        )
+        const types = tally(node.instances.map(instance => instance.type))
+        node.type = singleVal(types, "", "...")
+      })
       const newGraph = {
         nodes,
         links,
