@@ -57,22 +57,15 @@ def get_graph_data(df):
         df[["SRC_NODE_INDEX", "DST_NODE_INDEX"]]
         .groupby(["SRC_NODE_INDEX", "DST_NODE_INDEX"], as_index=False)
     )
-    print("=== ORIG DF")
-    import pickle
-    import base64
-    print(f"import base64; import pickle; df = pickle.loads(base64.a85decode({repr(base64.a85encode(pickle.dumps(df)))}))")
     edge_df = df_grouped.size()
     reg_series = []
     for key, indices in df_grouped.groups.items():
-        print("-", key, ":", indices)
         regs = df["REG"][indices].to_numpy()
         if (regs[0] == regs).all():
             reg_series.append(regs[0])
         else:
             reg_series.append(2)
     edge_df["REG"] = reg_series
-    print("=== EDGE DF")
-    print(edge_df)
 
     # Construct directed graph
     graph = ig.Graph(directed=True)
@@ -174,8 +167,6 @@ def save_graph(graph, output_file):
     # Create edges
     # This is a trick to make Plotly support different edge widths, but it could slow down the graph
     for group_name, group in graph["edges"].groupby(["size"]):
-        print(f"======== GROUP: {group_name}")
-        print(group)
         traces.append(
             go.Scatter3d(
                 x=group[["X_SRC", "X_DST", "DUMMY"]].to_numpy().flatten(),
