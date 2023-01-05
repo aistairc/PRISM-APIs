@@ -18,12 +18,17 @@ from utils import file_utils
 
 ANTECEDENT_ROLES = ["Cause", "disorder"]
 CONSEQUENT_ROLE = "Theme"
+NEGATED_ATTR = "Negated"
+
 POSITIVE_REGULATION = "Positive_regulation"
 NEGATIVE_REGULATION = "Negative_regulation"
-REGULATION_EVENT_TYPES = { POSITIVE_REGULATION, NEGATIVE_REGULATION }
-DIRECT = "Regulation"
+NEUTRAL_REGULATION = "Regulation"
+REGULATION_EVENT_TYPES = { POSITIVE_REGULATION, NEUTRAL_REGULATION, NEGATIVE_REGULATION }
+DIRECT = "Direct_regulation"
+
 class Regulation(IntEnum):
     UNREGULATED = 0
+    NEUTRAL = -2
     POSITIVE = 1
     NEGATIVE = -1
 
@@ -33,6 +38,8 @@ class Regulation(IntEnum):
             return cls.POSITIVE
         elif t.type == NEGATIVE_REGULATION:
             return cls.NEGATIVE
+        elif t.type == NEUTRAL_REGULATION:
+            return cls.NEUTRAL
         else:
             return cls.UNREGULATED
 
@@ -42,7 +49,7 @@ ENTITY = namedtuple(
 NORMALIZATION = namedtuple(
     "Normalization", ["id", "type", "target", "refdb", "refid", "tail"]
 )
-EVENT = namedtuple("Event", ["id", "trigger", "args", "regulation"], defaults=[Regulation.UNREGULATED])
+EVENT = namedtuple("Event", ["id", "trigger", "args", "regulation", "attributes"], defaults=[Regulation.UNREGULATED])
 
 EXTERNAL_API_BASE_URL = os.environ.get('EXTERNAL_API_BASE_URL', 'http://127.0.0.1:9091')
 
@@ -56,6 +63,12 @@ def annotate(task, doc):
 
         annotations = res.json()
 
+        attribute_map = defaultdict(dict)
+        for attribute in annotations["attributes"]:
+            attr_id, attr_type, event_id, value = attribute
+            attribute_map[event_id][attr_type] = value
+
+
         entities = annotations["entities"] + annotations["triggers"]
         norms = annotations["normalizations"]
         cuis = annotations["cui_data"]
@@ -64,7 +77,7 @@ def annotate(task, doc):
         entities = [ENTITY(*(e + [None, None, None])) for e in entities]
         ev_entity_map = {e.id: e for e in entities}
         norms = [NORMALIZATION(*n) for n in norms]
-        events = [EVENT(*e, Regulation.for_type(ev_entity_map[e[1]])) for e in events]
+        events = [EVENT(*e, Regulation.for_type(ev_entity_map[e[1]]), attribute_map[e[0]]) for e in events]
 
         return entities, norms, cuis, events, annotations
     except requests.HTTPError as ex:
@@ -108,6 +121,11 @@ class RegulationSquasher:
             })
 
         # events
+        events = {
+            event_id: event for event_id, event in events.items()
+            if not event.attributes.get(NEGATED_ATTR)
+        }
+
         for event in events.values():
             event_map[event.id] = event
 
@@ -133,36 +151,55 @@ class RegulationSquasher:
                             consequent_node_key = consequent.umls_id or f'"{consequent.text}"'
                             consequent_node = self.node_key_map[consequent_node_key]
 
-                            brat_ids = [[event.id], [trigger.id], [antecedent_id], [consequent_id]]
+                            brat_ids = [
+                                [antecedent_id],
+                                [event.id, antecedent_role, antecedent_id],
+                                [event.id],
+                                [event.id, consequent_role, consequent_id],
+                                [consequent_id],
+                            ]
                             regulation_events[event.id].append([True, antecedent_node, consequent_node, event.regulation, DIRECT, brat_ids])
                         else:
                             # consequent is event
-                            consequent_event = event_map[consequent_id]
-                            consequent_type = entity_map[consequent_event.trigger].type
-                            sub_consequents = [arg for arg in consequent_event.args if arg[0] == CONSEQUENT_ROLE]
-                            if not sub_consequents:
-                                # must have consequents
-                                continue
-                            for sub_consequent_role, sub_consequent_id in sub_consequents:
-                                if consequent_type in REGULATION_EVENT_TYPES:
-                                    # consequent is a regulation event
-                                    # XXX add arc is as well? look up format
-                                    brat_ids = [[event.id], [trigger.id], [antecedent_id]] # consequent will be added later
-                                    regulation = Regulation(consequent_event.regulation * event.regulation)
-                                    event_descriptor = (True, event.id, antecedent_node, sub_consequent_id, regulation, brat_ids)
-                                    reg_regulation_events.append(event_descriptor)
-                                else:
-                                    # consequent is a non-regulation event
-                                    sub_consequent = entity_map.get(sub_consequent_id)
-                                    if not sub_consequent:
-                                        # sub consequent must be an entity
-                                        continue
-                                    # XXX add arc is as well? look up format
-                                    sub_consequent_node_key = sub_consequent.umls_id or f'"{sub_consequent.text}"'
-                                    sub_consequent_node = self.node_key_map[sub_consequent_node_key]
-                                    brat_ids = [[event.id], [trigger.id], [antecedent_id], [consequent_id], [sub_consequent_id]]
-                                    event_descriptor = [True, antecedent_node, sub_consequent_node, event.regulation, consequent_type, brat_ids]
-                                    regulation_events[event.id].append(event_descriptor)
+                            consequent_event = event_map.get(consequent_id)
+                            if consequent_event:
+                                # consequent was not ignored for being Negated
+                                consequent_type = entity_map[consequent_event.trigger].type
+                                sub_consequents = [arg for arg in consequent_event.args if arg[0] == CONSEQUENT_ROLE]
+                                for sub_consequent_role, sub_consequent_id in sub_consequents:
+                                    if consequent_type in REGULATION_EVENT_TYPES:
+                                        # consequent is a regulation event
+                                        brat_ids = [
+                                            [antecedent_id],
+                                            [event.id, antecedent_role, antecedent_id],
+                                            [event.id],
+                                            # consequent will be added later
+                                        ]
+                                        if consequent_event.regulation == Regulation.NEUTRAL or event.regulation == Regulation.NEUTRAL:
+                                            regulation = Regulation.NEUTRAL
+                                        else:
+                                            regulation = Regulation(consequent_event.regulation * event.regulation)
+                                        event_descriptor = (True, event.id, antecedent_node, sub_consequent_id, regulation, brat_ids)
+                                        reg_regulation_events.append(event_descriptor)
+                                    else:
+                                        # consequent is a non-regulation event
+                                        sub_consequent = entity_map.get(sub_consequent_id)
+                                        if not sub_consequent:
+                                            # sub consequent must be an entity
+                                            continue
+                                        sub_consequent_node_key = sub_consequent.umls_id or f'"{sub_consequent.text}"'
+                                        sub_consequent_node = self.node_key_map[sub_consequent_node_key]
+                                        brat_ids = [
+                                            [antecedent_id],
+                                            [event.id, antecedent_role, antecedent_id],
+                                            [event.id],
+                                            [event.id, consequent_role, consequent_id],
+                                            [consequent_id],
+                                            [consequent_id, sub_consequent_role, sub_consequent_id],
+                                            [sub_consequent_id],
+                                        ]
+                                        event_descriptor = [True, antecedent_node, sub_consequent_node, event.regulation, consequent_type, brat_ids]
+                                        regulation_events[event.id].append(event_descriptor)
 
         changed = True
         while reg_regulation_events and changed:
@@ -224,6 +261,21 @@ class RegulationSquasher:
                 })
 
     def graph_data(self):
+        used_node_brat_ids = set()
+        for link in self.link_list:
+            for instance in link["instances"]:
+                antecedent = instance["brat_ids"][0][0]
+                consequent = instance["brat_ids"][-1][0]
+                doc = instance["doc"]
+                used_node_brat_ids.add((doc, antecedent))
+                used_node_brat_ids.add((doc, consequent))
+
+        for node in self.node_list:
+            node["instances"] = [
+                instance for instance in node["instances"]
+                if (instance["doc"], instance["brat_ids"][0][0]) in used_node_brat_ids
+            ]
+
         return {
             "nodes": self.node_list,
             "links": self.link_list,

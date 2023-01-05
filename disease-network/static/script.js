@@ -19,11 +19,14 @@ function checkForResult() {
       progressBarEl.text(`${data.current} / ${data.total}`);
 
       if (data.status === true) {
+        /*
         statusEL.addClass("d-none");
         graphURLEL.attr("href", pageData.graphURL);
         graph2DURLEL.attr("href", pageData.graph2DURL);
         graph3DURLEL.attr("href", pageData.graph3DURL);
         resultsEL.removeClass("d-none");
+        */
+        window.location.href = pageData.graphURL;
       } else {
         setTimeout(checkForResult, CHECK_RESULT_DELAY);
       }

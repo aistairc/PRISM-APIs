@@ -159,6 +159,7 @@ def save_graph(graph, output_file):
     )
 
     REG_COLOR = {
+        -2: "#999999",
         1: "#33cc33",
         0: "#495057",
         -1: "#ff6666",

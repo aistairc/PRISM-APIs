@@ -37,99 +37,114 @@
 
     const collData = {"entity_attribute_types": [], "entity_types": [{"arcs": [], "attributes": [], "bgColor": "lightgray", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Dummy", "normalizations": [], "type": "Dummy", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#c2a47c", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Disorder", "normalizations": [], "type": "Disorder", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#f2d4ac", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Measurement ", "normalizations": [], "type": "Measurement ", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#9fdeee", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Anatomical_entity", "normalizations": [], "type": "Anatomical_entity", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#9fffff", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Cell", "normalizations": [], "type": "Cell", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#afffee", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Cell_component", "normalizations": [], "type": "Cell_component", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#7fff00", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Inorganic_compound", "normalizations": [], "type": "Inorganic_compound", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#00ff7f", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Organic_compound_other", "normalizations": [], "type": "Organic_compound_other", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#00ff9f", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Pharmacological_substance", "normalizations": [], "type": "Pharmacological_substance", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#7fa2ee", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Protein_family_or_group", "normalizations": [], "type": "Protein_family_or_group", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "cyan", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Entity_Property", "normalizations": [], "type": "Entity_Property", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#bb2222", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Genetic_info", "normalizations": [], "type": "Genetic_info", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "white", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Negated", "normalizations": [], "type": "Negated", "unused": false}], "event_attribute_types": [], "event_types": [], "relation_attribute_types": [], "relation_types": [], "ui_names": {"attributes": "attributes", "entities": "entities", "events": "events", "relations": "relations"}, "unconfigured_types": [], "visual_options": {"arc_bundle": "all", "text_direction": "ltr"}};
   </script>
-  </script><!-- <script type="text/javascript" src="http://d3js.org/d3.v3.min.js"></script> -->
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.23.0/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/kinimesi/cytoscape-svg@0.4.0/cytoscape-svg.js"></script>
+  <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+  <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+  <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
+
   <script type="text/javascript" src="{{ url_for(app_name + ".static", filename="disease_network_script.js") }}"></script>
 {%- endblock %}
 
 {% block content %}
   {{ super() }}
-  <div class="sidebar-wrapper">
-    <div class="sidebar-buttons">
-      <label>
-        <input type="radio" name="tab-selector" class="tab-selector" checked>
-        <nav class="material-symbols-outlined">
-          coronavirus
-        </nav>
-        <section class="sidebar-tab">
-          <h1>
-            Disease Network
-          </h1>
-          <p>
-            &copy; AIST 2022
-          </p>
-        </section>
+  <div id="container">
+    <input id="tab-about-cb" type="radio" name="tab-selector" class="tab-selector" checked value="about">
+    <input id="tab-info-cb" type="radio" name="tab-selector" class="tab-selector" value="info">
+    <input id="tab-filters-cb" type="radio" name="tab-selector" class="tab-selector" value="filters">
+    <input id="tab-export-cb" type="radio" name="tab-selector" class="tab-selector" value="export">
+    <input id="tab-close-cb" type="radio" name="tab-selector" class="tab-selector" value="close">
+
+    <nav id="sidebar-buttons">
+      <label id="tab-about-btn" for="tab-about-cb" class="material-symbols-outlined">
+        coronavirus
       </label>
-      
-      <label>
-        <input id="tab-info" type="radio" name="tab-selector" class="tab-selector">
-        <nav class="material-symbols-outlined">
-          info
-        </nav>
-        <section class="sidebar-tab">
-          <h2 id="info-header">
-          </h2>
-          <div id="info">
-          </div>
-        </section>
-      </label><!-- tab-info -->
-      
-      <label>
-        <input id="tab-filters" type="radio" name="tab-selector" class="tab-selector">
-        <nav class="material-symbols-outlined">
-          tune
-        </nav>
-        <section class="sidebar-tab">
-          <h2>
-            Filters
-          </h2>
+      <label id="tab-info-btn" for="tab-info-cb" class="material-symbols-outlined">
+        info
+      </label>
+      <label id="tab-filters-btn" for="tab-filters-cb" class="material-symbols-outlined">
+        tune
+      </label>
+      <label id="tab-export-btn" for="tab-export-cb" class="material-symbols-outlined">
+        ios_share
+      </label>
+      <label id="tab-zoom-in-btn" class="material-symbols-outlined">
+        zoom_in
+      </label>
+      <div class="spacer"></div>
+      <label id="tab-close-btn" for="tab-close-cb" class="material-symbols-outlined">
+        close
+      </label>
+    </nav>
 
-          <fieldset id="relation-filters">
-            <legend>Relation types</legend>
-            <!--
-            <label>
-              <input type="checkbox" checked> Gene expression
-            </label>
-            -->
-          </fieldset>
+    <aside id="tab-panes">
+      <section id="tab-about-pane" class="sidebar-tab">
+        <h1>
+          Disease Network
+        </h1>
+        <p>
+          &copy; AIST 2022
+        </p>
+      </section>
 
-          <fieldset id="regulation-filters">
-            <legend>Regulation types</legend>
-          </fieldset>
+      <section id="tab-info-pane" class="sidebar-tab">
+        <div id="node-list">
+        </div>
+        <div id="info">
+        </div>
+      </section>
 
-          <fieldset id="document-filters">
-            <legend>Documents</legend>
-          </fieldset>
-        </section>
-      </label><!-- tab-filters -->
+      <section id="tab-filters-pane" class="sidebar-tab">
+        <h2>
+          Filters
+        </h2>
 
-      <label>
-        <input id="tab-filters" type="radio" name="tab-selector" class="tab-selector">
-        <nav class="material-symbols-outlined">
-          ios_share
-        </nav>
-        <section class="sidebar-tab">
-          <h2>
-            Export
-          </h2>
-          <a href="#" id="download-json" download="graph.json">
-            Download JSON
+        <fieldset id="relation-filters">
+          <legend>Relation types</legend>
+          <!--
+          <label>
+            <input type="checkbox" checked> Gene expression
+          </label>
+          -->
+        </fieldset>
+
+        <fieldset id="regulation-filters">
+          <legend>Regulation types</legend>
+        </fieldset>
+
+        <fieldset id="document-filters">
+          <legend>Documents</legend>
+        </fieldset>
+      </section>
+
+      <section id="tab-export-pane" class="sidebar-tab">
+        <h2>
+          Export
+        </h2>
+        <div>
+          <a href="#" id="download-json" download="disease-graph.json">
+            JSON
           </a>
-        </section>
-      </label><!-- tab-export -->
+        </div>
+        <div>
+          <a href="#" id="download-png" download="disease-graph.png">
+            PNG
+          </a>
+        </div>
+        <div>
+          <a href="#" id="download-svg" download="disease-graph.svg">
+            SVG
+          </a>
+        </div>
+      </section>
+    </aside>
 
-      <label id="tab-close-button">
-        <input id="tab-close" type="radio" name="tab-selector" class="tab-selector">
-        <nav class="material-symbols-outlined">
-          close
-        </nav>
-      </label><!-- tab-close -->
-    </div><!-- .sidebar-buttons -->
-  </div><!-- .sidebar-wrapper -->
-  <main>
-    <svg id="graphsvg"></svg>
-    <div id="vis">
-      <div id="brat"/>
-    </div>
-  </main>
+    <main>
+      <div id="graph"></div>
+      <div id="vis">
+        <div id="brat"/>
+      </div>
+    </main>
+  </div>
 {%- endblock %}

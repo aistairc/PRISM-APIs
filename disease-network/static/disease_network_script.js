@@ -4,49 +4,22 @@
 
 
 
-const outline = false
-const maxThickness = 5
-
-const highlight_color = "blue"
-const highlight_color_label = "black"
-const highlight_trans = 0.1
-const link_text_opacity = 0.5
-const nodeSize = 5
-const zoomInSpeed = 500
-const simAlpha = 0.1
-
-const bow_offset = 20
-const default_node_color = "#ccc"
-const default_node_label_color = "#000"
-const [tocolor, towhite] = outline
-  ? ["stroke", "fill"]
-  : ["fill", "stroke"]
-const regulation_names = {
-  "-1": "negative",
-  0: "neutral",
-  1: "positive",
-  2: "mixed",
-}
-const nice_regulation_names = {
+const regNames = {
+  "-2": "Unspecified",
   "-1": "Negative",
-  0: "Neutral",
+  0: "Unregulated",
   1: "Positive",
   2: "Mixed",
 }
-const regMarkers = {
-  "-1": "⊖",
-  0: "",
-  1: "⊕",
-  2: "⊙",
-}
-const regulation_colors = {
+const regColors = {
+  "-2": "#aa6",
   "-1": "#c66",
-  0: "#999",
+  0: "#000",
   1: "#6c6",
-  2: "#aa6", // mixed
+  2: "#660",
 }
 
-const node_colors = {
+const nodeColors = {
   Disorder: "#fa0",
 }
 
@@ -56,7 +29,9 @@ head.js(
   () => head.js(...urls.libraries, onReady)
 );
 
+
 let dispatcher
+let focus
 function onReady() {
   Util.loadFonts = function() {};
   window.Configuration = {
@@ -85,6 +60,7 @@ function onReady() {
   dispatcher.post('init');
   dispatcher
     .on('resize', onResize)
+    .on('doneRendering', onDoneRendering)
 
   let resizerTimeout = null;
   function resizeFunction(evt) {
@@ -96,442 +72,399 @@ function onReady() {
       resizerTimeout = setTimeout(resizeFunction, 100); // TODO is 100ms okay?
     }
   }
-}
 
-// Adapted from https://stackoverflow.com/a/43825818/240443
-function dist(a, b){
-  return Math.sqrt(
-    Math.pow(a[0] - b[0], 2) +
-    Math.pow(a[1] - b[1], 2))
-}
-function calcCirclePath(a, b, m) {
-  const A = dist(b, m)
-  const B = dist(m, a)
-  const C = dist(a, b)
-
-  const angle = Math.acos((A*A + B*B - C*C) / (2*A*B))
-
-  //calc radius of circle
-  const K = .5*A*B*Math.sin(angle)
-  const r = A*B*C/4/K
-
-  //large arc flag
-  const laf = +(Math.PI/2 > angle)
-
-  //sweep flag
-  const saf = +((b[0] - a[0])*(m[1] - a[1]) - (b[1] - a[1])*(m[0] - a[0]) < 0) 
-
-  return ['M', a, 'A', r, r, 0, laf, saf, b].join(' ')
-}
-
-// Adapted from https://math.stackexchange.com/a/995675/145106
-function calcBowPath(a, b, o) {
-  if (!o) {
-    return ['M', a, 'L', b].join(' ')
-  } else {
-    const dx = b[0] - a[0]
-    const dy = b[1] - a[1]
-    const s = o / Math.sqrt(dy * dy + dx * dx)
-    const m = [
-      (a[0] + b[0]) / 2 + s * dy,
-      (a[1] + b[1]) / 2 - s * dx,
-    ]
-    return calcCirclePath(a, b, m)
-  }
-}
-function linkBow(d) {
-  if (d.source.x == d.target.x && d.source.y == d.target.y) return ''
-  // make sure link fits between the two nodes
-  const o = "bidir" in d
-    ? (d.bidir - 0.5) * bow_offset
-    : 0
-  return calcBowPath([d.source.x, d.source.y], [d.target.x, d.target.y], o)
-}
-
-
-function tally(items) {
-  return items.reduce((a, e) => {
-    a[e] ||= 0
-    a[e]++
-    return a
-  }, {})
-}
-function singleVal(tally, empty, multi) {
-  const items = Object.keys(tally)
-  if (items.length == 1) {
-    return items[0]
-  } else if (items.length) {
-    return multi
-  } else {
-    return empty
-  }
-}
-function regulationColor(d) {
-  return regulation_colors[d.regulation]
-}
-
-function nodeColor(d) {
-    return node_colors[d.type] ?? default_node_color
-}
-function linkLabel(d) {
-  let name = d.type
-  let reg = d.regulation
-  if (reg) {
-    name += " " + regMarkers[reg]
-  }
-  name += ` [${d.id}]` // XXX GTDBEUG
-  return name
-}
-
-
-const svg = d3.select("#graphsvg")
-  .style("cursor","move")
-  .on("resize", resizeHandler)
-let w
-let h
-
-function resizeHandler(e) {
-  const svgRect = svg.node().getBoundingClientRect()
-  w = svgRect.width
-  h = svgRect.height
-}
-resizeHandler()
-
-let focus_node = null, highlight_node = null
-
-
-// const simulation = d3.layout.force()
-//   .linkDistance(150)
-//   .charge(-500)
-//   .size([w,h])
-// const simulation = d3.forceSimulation()
-//   .force("charge", d3.forceManyBody())
-//   .force("link", d3.forceLink().distance(150))
-//   .force("center", d3.forceCenter(w / 2, h / 2));
-
-const simulation = d3.forceSimulation()
-const linkForce =  d3.forceLink()
-  .id(d => d.id)
-  //.distance(100)
-const chargeForce = d3.forceManyBody()
-  .strength(-20000)
-const centerForce = d3.forceCenter(w / 2, h / 2)
-const collideForce = d3.forceCollide(30)
-simulation
-  .force("charge", chargeForce)
-  .force("center", centerForce)
-  .force("link", linkForce)
-  .force("collide", collideForce)
-
-setTimeout(() => {
-  chargeForce.strength(10)
-  simulation.alpha(simAlpha).restart()
-}, 200)
-
-
-
-const nominal_base_node_size = 5
-const nominal_text_size = 10
-const nominal_stroke = 0.8
-const min_zoom = 0.1
-const max_zoom = 10
-
-
-
-const zoom = d3.zoom()
-  .scaleExtent([min_zoom, max_zoom])
-
-/* Initialize Group */
-const topG = svg.append("g").attr('id', 'top')
-const edgeG = topG.append("g").attr('id', 'edges')
-const edgeLabelG = topG.append("g").attr('id', 'edge-labels')
-const defG = topG.append("g").attr('id', 'defs')
-const nodeLabelG = topG.append("g").attr('id', 'node-labels')
-const nodeG = topG.append("g").attr('id', 'nodes')
-
-Object.entries(regulation_colors).forEach(([reg, color]) => {
-  const regulationName = regulation_names[reg]
-  const markerG = defG.append('defs').attr('id', 'defs-' + regulationName)
-  for (let i = 1; i <= maxThickness; i++) {
-    const t = i + 0.3
-    markerG.append('marker')
-      .attr('id', 'arrowhead-' + regulationName + "-" + i)
-      .attr('class', regulation_names[reg])
-      .attr('viewBox', '-0 -5 10 10')
-      .attr('refX', 13)
-      .attr('refY', 0)
-      .attr('orient', 'auto')
-      .attr('markerWidth', 13)
-      .attr('markerHeight', 13)
-      .attr('markerUnits', 'userSpaceOnUse')
-      .append('path')
-      .attr('d', `M 0,-${t} L 10,0 L 0,${t}`)
-      .style('fill', color)
-      .style('stroke', 'none')
-  }
-})
-
-d3.json(graphData).then(graph => {
-  d3.select('#download-json')
-    .attr('href', graphData)
-  graph.nodes.forEach((d, i) => d.id = i)
-  graph.links.forEach((d, i) => d.id = i)
-  const maxCoEdges = Math.max(...graph.links.map(d => d.instances.length))
-  const thicknessScale = maxCoEdges > maxThickness
-    ? d3.scaleLog().base(2) // XXX scaleSqrt?
-      .domain([1, maxCoEdges])
-      .range([1, maxThickness])
-    : (x => x)
-  function getThickness(d) {
-    return thicknessScale(d.instances.length)
-  }
-  function getMarker(d) {
-    const regulationName = regulation_names[d.regulation]
-    return `url(#arrowhead-${regulationName}-${d.thickness})`
+  function onDoneRendering() {
+    if (focus) {
+      let minY = null
+      let el
+      for (const focusItem of focus) {
+        if (focusItem.length == 3) {
+          el = $(`[data-arc-origin="${focusItem[0]}"][data-arc-role="${focusItem[1]}"][data-arc-target="${focusItem[2]}"]`)[0]
+        } else {
+          el = $(`[data-span-id="${focusItem[0]}"]`)[0]
+        }
+        const y = Math.max(
+          el.parentNode.parentNode.parentNode.transform.baseVal[0].matrix.f
+          + +el.getAttribute('y') - 20,
+          0
+        )
+        if (!minY || y < minY) {
+          minY = y
+        }
+      }
+      $('#vis')[0].scrollTop = minY
+    }
   }
 
-  const linkedByIndex = {}
-  graph.links.forEach(d => linkedByIndex[d.source + "," + d.target] = true)
-  function isConnected(a, b) {
-    return a.index == b.index
-      || linkedByIndex[a.index + "," + b.index]
-      || linkedByIndex[b.index + "," + a.index]
+  fetch(graphData)
+  .then(res => res.json())
+  .then(drawGraph)
+}
+
+
+
+let cy = null
+function drawGraph(graph) {
+  cy = cytoscape({
+    container: document.getElementById('graph'),
+    layout: {
+      name: 'cose',
+    },
+    responsive: true,
+    elements: {
+      nodes: graph.nodes.map(data => ({
+        data: {
+          ...data,
+          id: `n${data.id}`,
+        }, 
+      })),
+      edges: graph.links.map(data => ({
+        data: {
+          ...data,
+          id: `e${data.id}`,
+          source: `n${data.source}`,
+          target: `n${data.target}`,
+        },
+      })),
+    },
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'background-color': 'blue',
+          'font-size': 7,
+          height: 10,
+          width: 10,
+          label: 'data(name)',
+        }
+      },
+      {
+        selector: 'node[type="..."]',
+        style: {
+          'background-color': 'magenta',
+        }
+      },
+      {
+        selector: 'node[type="Disorder"]',
+        style: {
+          'background-color': 'red',
+        }
+      },
+
+      {
+        selector: 'edge',
+        style: {
+          'font-size': 4,
+          'text-rotation': 'autorotate',
+          'target-arrow-shape': 'triangle',
+          'line-opacity': 0.5,
+          'curve-style': 'straight',
+        }
+      },
+      {
+        selector: 'edge[type]',
+        style: {
+          label: 'data(type)',
+        },
+      },
+      ...Object.entries(regColors).map(([reg, color]) => ({
+        selector: `edge[regulation=${reg}]`,
+        style: {
+          'line-color': color,
+          'target-arrow-color': color,
+        }
+      })),
+      {
+        selector: '*:selected',
+        style: {
+          'underlay-color': 'yellow',
+          'underlay-padding': 5,
+          'underlay-shape': 'ellipse',
+          'underlay-opacity': 1,
+        },
+      },
+    ],
+  })
+  cy.remove(cy.nodes().filter('[[degree = 0]]'))
+
+  // TODO XXX not really working
+  let zoomInMargin
+  let zoomOutMargin = 10
+  function resize() {
+    zoomInMargin = Math.min(
+      cy.width() / 4,
+      cy.height() / 4,
+    )
   }
+  resize()
+  cy.on('resize', resize)
 
-  simulation.nodes(graph.nodes);
-  linkForce.links(graph.links);
+  // XXX DEBUG
+  cy.on('select', 'node', function(evt) {
+    displayNodeInfo(this)
+  })
+  cy.on('select', 'edge', function(evt) {
+    displayEdgeInfo(this)
+  })
+  cy.on('unselect', '*', evt => displayNodeList())
 
-  let links = edgeG.selectAll("path")
-  let edgelabels = edgeLabelG.selectAll("text")
-  let nodes = nodeG.selectAll("circle")
-  let nodelabels = nodeLabelG.selectAll("text")
 
-  let startDragE = null
-  const drag = d3.drag()
-    .on("start", e => {
-      // avoid drag on mere click
-      startDragE = e
-    })
-    .on("drag", e => {
-      if (startDragE) {
-        if (!startDragE.active) simulation.alphaTarget(0.3).restart()
-        e.subject.fx = startDragE.subject.x
-        e.subject.fy = startDragE.subject.y
-        startDragE = null;
-      } else {
-        e.subject.fx = e.x
-        e.subject.fy = e.y
+  $('#tab-zoom-in-btn')
+    .on('click', e => {
+      const oldZoomAndPan = cy.pan()
+      oldZoomAndPan.z = cy.zoom()
+      cy.fit(cy.elements('*:selected'), zoomInMargin)
+      const newZoomAndPan = cy.pan()
+      newZoomAndPan.z = cy.zoom()
+      if (oldZoomAndPan.x == newZoomAndPan.x
+        && oldZoomAndPan.y == newZoomAndPan.y
+        && oldZoomAndPan.z == newZoomAndPan.z
+      ) {
+        cy.fit(cy.elements(), zoomOutMargin)
       }
     })
-    .on("end", e => {
-      exit_focus()
-      if (!e.active) simulation.alphaTarget(0)
-      e.subject.fx = null
-      e.subject.fy = null
+  $('<span class="float-right textlink material-symbols-outlined">zoom_out</span>')
+
+  window.cy = cy // DEBUG
+
+
+  class Filter {
+    constructor(items, prop, $element, callback) {
+      this.prop = prop
+      items = items.map(item => Array.isArray(item) ? item : [item, item])
+      this.filter = Object.fromEntries(items.map(([value, name]) => [value, true]))
+      for (const [value, name] of items) {
+        const $label = $('<label/>')
+          .appendTo($element)
+        const $cb = $('<input type="checkbox" checked/>')
+          .val(value)
+          .on('change', evt => {
+            this.filter[value] = evt.target.checked
+            callback()
+          })
+          .appendTo($label)
+        const $text = $('<span/>')
+          .text(name)
+          .appendTo($label)
+      }
+    }
+
+    applyTo(instances) {
+      return instances.filter(instance => this.filter[instance[this.prop]])
+    }
+
+    static applyTo(instances, filters) {
+      return filters.reduce(
+        (instances, filter) => filter.applyTo(instances),
+        instances
+      )
+    }
+  }
+
+  function uniquePropValues(instances, prop) {
+    const itemList = instances.map(instance => instance[prop])
+    const items = [...new Set(itemList)]
+    items.sort()
+    return items
+  }
+  
+  const allEdgeInstances = cy.edges().map(item => item.data('instances')).flat()
+
+  const typeFilter = new Filter(
+    uniquePropValues(allEdgeInstances, 'type'),
+    'type', $('#relation-filters'), filtersChangedHandler
+  )
+  const regFilter = new Filter(
+    uniquePropValues(allEdgeInstances, 'regulation').map(reg => [reg, regNames[reg]]),
+    'regulation', $('#regulation-filters'), filtersChangedHandler
+  )
+  const docFilter = new Filter(
+    uniquePropValues(allEdgeInstances, 'doc'),
+    'doc', $('#document-filters'), filtersChangedHandler
+  )
+  const edgeFilters = [typeFilter, regFilter, docFilter]
+
+  function singleVal(instances, prop, none, multi) {
+    const valList = instances.map(instance => instance[prop])
+    const valUniques = [...new Set(valList)]
+    if (valUniques.length === 1) {
+      return valUniques[0]
+    } else {
+      return valUniques.length ? multi : none
+    }
+  }
+
+  let removedNodes = null;
+  let removedEdges = null;
+  function filtersChangedHandler() {
+    if (removedEdges) {
+      cy.add(removedNodes)
+      cy.add(removedEdges)
+    }
+    select(null)
+    cy.edges().forEach(edge => {
+      const edgeData = edge.data()
+      edgeData.filteredInstances = Filter.applyTo(edgeData.instances, edgeFilters)
+      edgeData.regulation = singleVal(edgeData.filteredInstances, 'regulation', 0, 2)
+      edgeData.type = singleVal(edgeData.filteredInstances, 'type', "", "...")
+      edgeData.doc = singleVal(edgeData.filteredInstances, 'doc', "", "...")
+      edge.data(edgeData)
     })
 
-  function update(graph) {
-    links = edgeG.selectAll("path")
-      .data(graph.links, d => d.id)
-    links.exit().remove()
-    const linksEnter = links.enter()
-      .append("path")
-    linksEnter
-      .attr('id', d => `edgepath${d.id}`)
-      .attr('marker-end', getMarker)
-      .style("fill", "none")
-    links = links.merge(linksEnter)
-    links
-      .attr("d", linkBow)
-      .style("stroke-width", d => d.thickness)
-      .style("stroke", regulationColor)
+    removedEdges = cy.remove(cy.edges().filter(edge => !edge.data('filteredInstances').length))
+    removedNodes = cy.remove(cy.nodes().filter('[[degree = 0]]'))
 
-    edgelabels = edgeLabelG.selectAll("text")
-      .data(graph.links, d => d.id)
-    edgelabels.exit().remove()
-    const edgelabelsEnter = edgelabels.enter()
-      .append('text')
-      .attr('class', 'edgelabel')
-      .attr('font-size', '8')
-      .attr('opacity', link_text_opacity)
-      //.style("pointer-events", "all")
-    edgelabelsEnter
-      .append('textPath')
-      .attr('xlink:href', d => `#edgepath${d.id}`)
-      .style("text-anchor", "middle")
-      .style("pointer-events", "all")
-      .attr("startOffset", "50%")
-      .on("click", (e, d) => displayEdgeInfo(d))
-    edgelabels = edgelabels.merge(edgelabelsEnter)
-      .attr('fill', regulationColor)
-      .attr('dy', d => -d.thickness)
-      .select('textPath')
-      .text(linkLabel)
+    cy.nodes().forEach(node => {
+      const nodeData = node.data()
+      nodeData.filteredInstances = docFilter.applyTo(nodeData.instances)
+      nodeData.doc = singleVal(nodeData.filteredInstances, 'doc', "", "...")
+      nodeData.type = singleVal(nodeData.filteredInstances, 'type', "", "...")
+      node.data(nodeData)
+    })
 
-    nodes = nodeG.selectAll("circle")
-      .data(graph.nodes, d => d.id)
-    nodes.exit().remove()
-    const nodesEnter = nodes.enter()
-      .append("circle")
-    nodesEnter
-      .attr('r', nodeSize)
-      .style(tocolor, nodeColor)
-      .style("stroke-width", nominal_stroke)
-      .style(towhite, "white")
-      .on("mouseover", (e, d) => set_highlight(d))
-      .on("mouseout", (e, d) => exit_highlight(d))
-      .on("mousedown", (e, d) => {
-        focus_node = d
-        set_focus(d)
-        if (!highlight_node) set_highlight(d)
-      })
-      .on("click", (e, d) => displayNodeInfo(d))
-      .style("cursor", "grab")
-      .call(drag)
-      .append("title")
-      .text(d => d.id)
-    nodes = nodes.merge(nodesEnter)
+    const nodeList = cy.nodes().sort((a, b) => {
+      let aa = a.data('name')
+      let bb = b.data('name')
+      if (aa.charAt(0) == '"') aa = aa.substring(1, aa.length - 2)
+      if (bb.charAt(0) == '"') bb = bb.substring(1, aa.length - 2)
+      return aa.localeCompare(bb)
+    })
+    const $nodeList = $('#node-list').empty()
+    $('<h2/>')
+      .text('Node List')
+      .appendTo($nodeList)
+    for (const node of nodeList) {
+      $('<div class="textlink"/>')
+        .text(node.data('name'))
+        .on('click', evt => select(node))
+        .appendTo($nodeList)
+    }
+  }
+  filtersChangedHandler()
 
-    nodelabels = nodeLabelG.selectAll("text")
-      .data(graph.nodes, d => d.id)
-    nodelabels.exit().remove()
-    const nodelabelsEnter = nodelabels.enter()
-      .append("text")
-    nodelabelsEnter
-      .on("mouseover", (e, d) => {
-        d3.select(this).style('fill', highlight_color)
-      })
-      .on("mouseout", (e, d) => {
-        d3.select(this).style('fill', default_node_label_color)
-      })
-      .on("click", (e, d) => displayNodeInfo(d))
-      .on("dblclick", (e, d) => {
-        d3.select(this).style('fill', default_node_label_color)
-        window.open(d.url)
-      })
-      .attr("dy", ".35em")
-      .attr("dx", nodeSize)
-      .style("font-size", nominal_text_size + "px")
-      .style("cursor", "pointer")
-      .style("fill", default_node_label_color)
-      .text(d => d.name)
-    nodelabels = nodelabels.merge(nodelabelsEnter)
-
-    simulation.nodes(graph.nodes);
-    simulation.force("link").links(graph.links);
-    simulation.alpha(0.05).restart(); // XXX
+  function select(ele) {
+    cy.elements('*:selected').unselect()
+    if (ele) {
+      ele.select()
+    }
   }
 
   function displayNodeInfo(node) {
-    d3.select('#tab-info')
-      .property('checked', true)
-    const info = d3.select('#tab-info ~ section').html('')
-    info.append('span')
-      .text('find_in_page')
-      .attr('class', 'material-symbols-outlined')
-      .style('float', 'right')
-      .style('cursor', 'pointer')
-      .on('click', (e, d) => {
-        const scale = 3.33
-        const transform = d3.zoomIdentity
-          .translate(
-            w / 2 - scale * node.x,
-            h / 2 - scale * node.y,
-          ).scale(scale)
-        svg.transition().duration(zoomInSpeed)
-          .call(zoom.transform, transform)
-      })
-    info.append('h2').text('Node Info')
-    info.append('h3').text(node.name)
-    info
-      .append('a')
-      .attr('href', node.url)
-      .attr('target', 'disease-network-cui')
-      .text(node.cui)
-    info.append('div').text(node.type)
-    const docFS = info.append('fieldset')
-    docFS.append('legend').text('Instances')
-    docFS.append('div').selectAll('div').data(node.instances).enter()
-      .append('div')
-      .classed('doclink', true)
-      .text(d => d.doc)
-      .on('click', (e, d) => {
-        displayDoc(d.doc, d.brat_ids)
-      })
+    $('#node-list').hide()
+    $('#tab-info-cb').prop('checked', true)
+    const $info = $('#info').empty()
+    const nodeData = node.data()
+    $('<h2/>')
+      .text('Node Info')
+      .appendTo($info)
+    $('<h3/>')
+      .text(nodeData.name)
+      .appendTo($info)
+    $('<a target="disease-network-cui"></a>')
+      .attr('href', nodeData.url)
+      .text(nodeData.cui)
+      .appendTo($info)
+
     ![
-      [node.outgoing, "Influences", "target"],
-      [node.incoming, "Influenced by", "source"],
+      [node.outgoers(), "Influences", "target"],
+      [node.incomers(), "Influenced by", "source"],
     ]
       .filter(([item]) => item.length)
-      .forEach(([links, name, otherEnd]) => {
-        const fs = info.append('fieldset')
-        fs.append('legend').text(name)
-        fs.append('div')
-          .selectAll('div').data(links).enter()
-          .append('div')
-          .text(d => d[otherEnd].name)
-          .style('cursor', 'pointer')
-          .on('click', (e, d) => displayEdgeInfo(d.doc))
+      .forEach(([edges, name, otherEnd]) => {
+        const $fs = $('<fieldset/>')
+          .appendTo($info)
+        $('<legend/>')
+          .text(name)
+          .appendTo($fs)
+        edges.forEach(edge => {
+          const otherNode = edge[otherEnd].bind(edge)()
+          $('<div class="textlink"/>')
+            .text(otherNode.data('name'))
+            .on('click', evt => select(edge))
+            .appendTo($fs)
+        })
       })
+
+    const $docFS = $('<fieldset/>')
+      .appendTo($info)
+    $('<legend/>')
+      .text('Events')
+      .appendTo($docFS)
+    const $instances = $('<div/>')
+      .appendTo($docFS)
+    nodeData.filteredInstances.forEach(instance => {
+      const $instance = $('<div/>')
+        .appendTo($instances)
+      $('<span class="textlink"/>')
+        .text(instance.doc)
+        .on('click', evt => displayDoc(instance.doc, instance.brat_ids))
+        .appendTo($instance)
+      $('<span/>')
+        .text(" " + instance.type)
+        .appendTo($instance)
+    })
   }
 
   function displayEdgeInfo(edge) {
-    d3.select('#tab-info')
-      .property('checked', true)
-    const info = d3.select('#tab-info ~ section').html('')
-    info.append('span')
-      .text('find_in_page')
-      .attr('class', 'material-symbols-outlined')
-      .style('float', 'right')
-      .style('cursor', 'pointer')
-      .on('click', (e, d) => {
-        const x = (edge.source.x + edge.target.x) / 2
-        const y = (edge.source.y + edge.target.y) / 2
-        const scale = 3.33
-        const transform = d3.zoomIdentity
-          .translate(
-            w / 2 - scale * x,
-            h / 2 - scale * y,
-          ).scale(scale)
-        svg.transition().duration(zoomInSpeed)
-          .call(zoom.transform, transform)
-      })
-    info.append('h2').text('Edge Info')
-    info.append('div').text(edge.source.name)
-      .style('cursor', 'pointer')
-      .on('click', (e, d) => displayNodeInfo(edge.source))
-    info.append('div').text('influences')
-    info.append('div').text(edge.target.name)
-      .style('cursor', 'pointer')
-      .on('click', (e, d) => displayNodeInfo(edge.target))
+    $('#node-list').hide()
+    $('#tab-info-cb').prop('checked', true)
+    const $info = $('#info').empty()
+    const edgeData = edge.data()
+    const sourceData = edge.source().data()
+    const targetData = edge.target().data()
+
+
+    $('<h2/>')
+      .text('Event Info')
+      .appendTo($info)
+    $('<h3/>')
+      .text(edgeData.name)
+      .appendTo($info)
+    $('<div class="textlink"></div>')
+      .text(edge.source().data().name)
+      .on('click', e => select(edge.source()))
+      .appendTo($info)
+    $('<div>')
+      .text('influences')
+      .appendTo($info)
+    $('<div class="textlink"></div>')
+      .text(edge.target().data().name)
+      .on('click', e => select(edge.target()))
+      .appendTo($info)
+
     const classified = Object.fromEntries(
-      Object.keys(regulation_names).map(reg => [reg, []])
+      Object.keys(regNames).map(reg => [reg, []])
     )
-    edge.instances.forEach(d => classified[d.regulation].push(d))
+    edgeData.filteredInstances.forEach(d => classified[d.regulation].push(d))
     Object.entries(classified)
       .filter(([reg, instances]) => instances.length)
       .forEach(([reg, instances]) => {
-        const fs = info.append('fieldset')
-          .style('border-color', regulation_colors[reg])
-        if (!instances.length) return;
-        fs.append('legend')
-          .text(nice_regulation_names[reg])
-        const instanceDiv = fs.append('div').selectAll('div').data(instances).enter()
-          .append('div')
-        instanceDiv
-          .append('div')
-          .classed('doclink', true)
-          .text(d => d.doc)
-          .on('click', (e, d) => displayDoc(d.doc, d.brat_ids))
-        instanceDiv
-          .append('span')
-          .text(d => ' ' + d.type) // TODO
+        const $fs = $('<fieldset/>')
+          .css('border-color', regColors[reg])
+          .appendTo($info)
+        $('<legend/>')
+          .text(regNames[reg])
+          .appendTo($fs)
+        instances.forEach(instance => {
+          const $instance = $('<div/>')
+            .appendTo($fs)
+          $('<div class="textlink">')
+            .text(instance.doc)
+            .on('click', evt => displayDoc(instance.doc, instance.brat_ids))
+            .appendTo($instance)
+          $('<span/>')
+            .text(' ' + instance.type)
+        })
       })
-    }
+  }
 
-  function displayDoc(doc, focus) {
-    d3.select('#vis').classed('show', true)
-    d3.json(docDataBase + doc).then(currentDocData => {
+  function displayDoc(doc, newFocus) {
+    focus = newFocus
+    console.log(newFocus)
+    $('#vis').addClass('show')
+    fetch(docDataBase + '/' + doc)
+    .then(res => res.json())
+    .then(currentDocData => {
       if (dispatcher) {
         dispatcher.post('current', [
           null,
@@ -545,177 +478,24 @@ d3.json(graphData).then(graph => {
           'renderData',
           [currentDocData],
         )
-        const el = d3.select(`[data-span-id="${focus[0][0]}"], [data-node-id="${focus[0][0]}"]`).node()
-        if (el) {
-          // XXX after layout is fixed
-          // el.scrollIntoView({ 'block': 'center' })
-        }
       }
     })
   }
 
-  function makeFilter(items, selector, filterCb) {
-    const filter = Object.fromEntries(items.map(item => [item, true]))
-    const labels = d3.select(selector).selectAll('label').data(items)
-    labels.exit().remove()
-    const label = labels.enter()
-      .append('label')
-    const checkbox = label
-      .append('input')
-      .attr('type', 'checkbox')
-      .attr('value', d => d)
-      .attr('checked', true)
-    label
-      .append('span')
-      .text(d => ` ${d}`)
-    checkbox.on('change', function(e, d) {
-      const checked = this.checked;
-      filter[d] = checked;
-      filterCb()
-    })
-    return filter
+  function displayNodeList() {
+    $('#node-list').show()
+    $('#info').empty()
   }
 
-  function makeFilters() {
-    const relTypes = [...new Set(graph.links.flatMap(link =>
-      link.instances.map(instance => instance.type)
-    ))].sort()
-    const relFilter = makeFilter(relTypes, '#relation-filters', filter)
-    const regTypes = ["Positive", "Negative"]
-    const regFilter = makeFilter(regTypes, '#regulation-filters', filter)
-    const regTypesRev = Object.fromEntries(regTypes.map((reg, i) => [1 - i * 2, reg]))
-    const docs = [...new Set(graph.links.flatMap(link =>
-      link.instances.map(instance => instance.doc)
-    ))].sort()
-    const docFilter = makeFilter(docs, '#document-filters', filter)
 
-    function filter() {
-      const links = []
-      const seenNodes = new Set()
-      const nodeMap = {}
-      graph.nodes.forEach(node =>
-        nodeMap[node.id] = { ...node, outgoing: [], incoming: [] }
-      )
-      graph.links.forEach(link => {
-        const newLink = { ...link }
-        newLink.source = nodeMap[link.source.id]
-        newLink.target = nodeMap[link.target.id]
-        newLink.source.outgoing.push(newLink)
-        newLink.target.incoming.push(newLink)
-        newLink.instances = link.instances.filter(instance =>
-          relFilter[instance.type]
-          && regFilter[regTypesRev[instance.regulation]]
-          && docFilter[instance.doc]
-        )
-        if (newLink.instances.length) {
-          links.push(newLink)
-          seenNodes.add(link.source.id)
-          seenNodes.add(link.target.id)
-        }
-        const regulations = tally(newLink.instances.map(instance => instance.regulation))
-        newLink.regulation = singleVal(regulations, 0, 2)
-        const types = tally(newLink.instances.map(instance => instance.type))
-        newLink.type = singleVal(types, "", "...")
-        newLink.thickness = getThickness(newLink)
-      })
-      const nodes = Object.values(nodeMap).filter(node => seenNodes.has(node.id))
-      nodes.forEach(node => {
-        node.instances = node.instances.filter(instance =>
-          docFilter[instance.doc]
-        )
-        const types = tally(node.instances.map(instance => instance.type))
-        node.type = singleVal(types, "", "...")
-      })
-      const newGraph = {
-        nodes,
-        links,
-      }
-      update(newGraph)
-    }
-
-    return filter
-  }
-
-  const filter = makeFilters()
-  filter()
-
-  function exit_focus() {
-    if (focus_node)  {
-      focus_node = null
-      if (highlight_trans < 1)  {
-        nodes.style("opacity", 1)
-        nodelabels.style("opacity", 1)
-        links.style("opacity", 1)
-        edgelabels.style("opacity", link_text_opacity)
-      }
-    }
-
-    if (highlight_node) exit_highlight()
-  }
-
-  function exit_highlight() {
-    highlight_node = null
-    if (!focus_node)  {
-      svg.style("cursor", "move")
-      if (highlight_color != "white") {
-        nodes.style(towhite, "white")
-        links.style("stroke", regulationColor)
-        edgelabels.style("opacity", link_text_opacity)
-        // edgelabels.style("fill", regulationColor)
-      }
-    }
-  }
-
-  function set_focus(d)   {
-    if (highlight_trans < 1)  {
-      nodes.style("opacity", o => isConnected(d, o) ? 1 : highlight_trans)
-      nodelabels.style("opacity", o => isConnected(d, o) ? 1 : highlight_trans)
-      links.style("opacity", o => o.source.index == d.index || o.target.index == d.index ? 1 : link_text_opacity)
-      edgelabels.style("opacity", o => o.source.index == d.index || o.target.index == d.index ? 1 : highlight_trans)
-    }
-  }
-
-  function set_highlight(d) {
-    svg.style("cursor", "pointer")
-    if (focus_node) d = focus_node
-    highlight_node = d
-    if (highlight_color !== "white") {
-      nodes.style(towhite, o => isConnected(d, o) ? highlight_color : "white")
-      links.style("stroke", o => o.source.index == d.index || o.target.index == d.index ? highlight_color : regulationColor(o))
-      edgelabels.style("opacity", o => o.source.index == d.index || o.target.index == d.index ? 1 : highlight_trans)
-      // edgelabels.style("fill", o => o.source.index == d.index || o.target.index == d.index ? highlight_color_label : regulationColor(o))
-    }
-  }
-
-  zoom.on("zoom", e => topG.attr("transform", e.transform))
-
-
-  svg.call(zoom)
-    .on("dblclick.zoom", null)
-    .on("mouseup.zoom", null)
-  resize()
-  window.focus()
-  
-  simulation.on("tick", tick)
-  function tick() {
-    const chargeForceStrength = chargeForce.strength()
-    if (chargeForceStrength > -500) chargeForce.strength(chargeForceStrength - 1)
-    nodes.attr("transform", d => `translate(${d.x.toFixed(4)},${d.y.toFixed(4)})`)
-    nodelabels.attr("transform", d => `translate(${d.x.toFixed(4)},${d.y.toFixed(4)})`)
-    links.attr("d", linkBow)
-  }
-
-  function resize() {
-    var width = window.innerWidth, height = window.innerHeight
-    svg.attr("width", width).attr("height", height)
-
-    // const simSize = simulation.size()
-    // simulation.force("center").initialize(...)? // TODO
-    // simulation.size([
-    //   simSize[0]+(width-w)/zoom.scale(),
-    //   simSize[1]+(height-h)/zoom.scale()],
-    // ).resume()
-    w = width
-    h = height
-  }
-})
+  $('#download-json').on('click contextmenu', evt => {
+    evt.target.href = "data:application/json," + encodeURIComponent(JSON.stringify(graph, null, 2))
+  })
+  $('#download-png').on('click contextmenu', evt => {
+    evt.target.href = cy.png()
+  })
+  $('#download-svg').on('click contextmenu', evt => {
+    window.b = cy.svg()
+    evt.target.href = "data:application/json," + encodeURIComponent(cy.svg())
+  })
+}
