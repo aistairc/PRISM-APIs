@@ -128,11 +128,17 @@ html h2 {
   display: block;
 }
 
-.textlink {
+.link, a.link:link, a.link:active, a.link:hover, a.link:visited {
   color: blue;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .float-right {
   float: right;
+}
+
+.link-icon {
+  font-size: 1em;
+  vertical-align: bottom;
 }

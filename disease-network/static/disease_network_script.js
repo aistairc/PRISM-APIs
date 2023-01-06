@@ -23,6 +23,10 @@ const nodeColors = {
   Disorder: "#fa0",
 }
 
+const minEdgeWidth = 3
+const maxEdgeWidth = 10
+const logFactor = 2
+
 
 head.js(
   urls.jquery,
@@ -159,6 +163,7 @@ function drawGraph(graph) {
           'target-arrow-shape': 'triangle',
           'line-opacity': 0.5,
           'curve-style': 'straight',
+          width: 'data(width)',
         }
       },
       {
@@ -223,7 +228,6 @@ function drawGraph(graph) {
         cy.fit(cy.elements(), zoomOutMargin)
       }
     })
-  $('<span class="float-right textlink material-symbols-outlined">zoom_out</span>')
 
   window.cy = cy // DEBUG
 
@@ -302,17 +306,37 @@ function drawGraph(graph) {
       cy.add(removedEdges)
     }
     select(null)
+
+    let maxInstances = 0
     cy.edges().forEach(edge => {
       const edgeData = edge.data()
       edgeData.filteredInstances = Filter.applyTo(edgeData.instances, edgeFilters)
       edgeData.regulation = singleVal(edgeData.filteredInstances, 'regulation', 0, 2)
       edgeData.type = singleVal(edgeData.filteredInstances, 'type', "", "...")
       edgeData.doc = singleVal(edgeData.filteredInstances, 'doc', "", "...")
+      const numInstances = edgeData.filteredInstances.length
+      if (numInstances > maxInstances) {
+        maxInstances = numInstances
+      }
       edge.data(edgeData)
     })
 
     removedEdges = cy.remove(cy.edges().filter(edge => !edge.data('filteredInstances').length))
     removedNodes = cy.remove(cy.nodes().filter('[[degree = 0]]'))
+
+    let scale
+    if (maxInstances * logFactor <= maxEdgeWidth - minEdgeWidth + 1) {
+      scale = x => minEdgeWidth + (x - 1) * logFactor
+    } else {
+      const log = x => Math.log(x) / Math.log(logFactor)
+      const maxLog = log(maxInstances)
+      const factor = (maxEdgeWidth - minEdgeWidth) / maxLog
+      scale = x => log(x) * factor + minEdgeWidth
+    }
+    cy.edges().forEach(edge => {
+      const width = scale(edge.data('filteredInstances').length)
+      edge.data('width', width)
+    })
 
     cy.nodes().forEach(node => {
       const nodeData = node.data()
@@ -334,10 +358,14 @@ function drawGraph(graph) {
       .text('Node List')
       .appendTo($nodeList)
     for (const node of nodeList) {
-      $('<div class="textlink"/>')
+      const $nodeLink = $('<div/>')
+        .appendTo($nodeList)
+      $('<span class="link-icon material-symbols-outlined">circle</span>')
+        .appendTo($nodeLink)
+      $('<span class="nodelink link"/>')
         .text(node.data('name'))
         .on('click', evt => select(node))
-        .appendTo($nodeList)
+        .appendTo($nodeLink)
     }
   }
   filtersChangedHandler()
@@ -360,17 +388,24 @@ function drawGraph(graph) {
     $('<h3/>')
       .text(nodeData.name)
       .appendTo($info)
-    $('<a target="disease-network-cui"></a>')
-      .attr('href', nodeData.url)
-      .text(nodeData.cui)
-      .appendTo($info)
+
+    if (nodeData.cui) {
+      const $dbLink = $('<div/>')
+        .appendTo($info)
+      $('<span class="link-icon material-symbols-outlined">database</span>')
+        .appendTo($dbLink)
+      $('<a class="dblink link" target="disease-network-cui"></a>')
+        .attr('href', nodeData.url)
+        .text(nodeData.cui)
+        .appendTo($dbLink)
+    }
 
     ![
-      [node.outgoers(), "Influences", "target"],
-      [node.incomers(), "Influenced by", "source"],
+      [node.outgoers().edges(), "Influences", "target", "line_end_arrow"],
+      [node.incomers().edges(), "Influenced by", "source", "line_start_arrow"],
     ]
       .filter(([item]) => item.length)
-      .forEach(([edges, name, otherEnd]) => {
+      .forEach(([edges, name, otherEnd, icon]) => {
         const $fs = $('<fieldset/>')
           .appendTo($info)
         $('<legend/>')
@@ -378,10 +413,15 @@ function drawGraph(graph) {
           .appendTo($fs)
         edges.forEach(edge => {
           const otherNode = edge[otherEnd].bind(edge)()
-          $('<div class="textlink"/>')
+          const $docLink = $('<div>')
+            .appendTo($fs)
+          $('<span class="link-icon material-symbols-outlined"/>')
+            .text(icon)
+            .appendTo($docLink)
+          $('<span class="link textlink"/>')
             .text(otherNode.data('name'))
             .on('click', evt => select(edge))
-            .appendTo($fs)
+            .appendTo($docLink)
         })
       })
 
@@ -395,7 +435,9 @@ function drawGraph(graph) {
     nodeData.filteredInstances.forEach(instance => {
       const $instance = $('<div/>')
         .appendTo($instances)
-      $('<span class="textlink"/>')
+      $('<span class="link-icon valign-mid material-symbols-outlined">article</span>')
+        .appendTo($instance)
+      $('<span class="link textlink"/>')
         .text(instance.doc)
         .on('click', evt => displayDoc(instance.doc, instance.brat_ids))
         .appendTo($instance)
@@ -420,17 +462,26 @@ function drawGraph(graph) {
     $('<h3/>')
       .text(edgeData.name)
       .appendTo($info)
-    $('<div class="textlink"></div>')
+
+    const $sourceLink = $('<div/>')
+      .appendTo($info)
+    $('<span class="link-icon material-symbols-outlined">circle</span>')
+      .appendTo($sourceLink)
+    $('<span class="nodelink link"/>')
       .text(edge.source().data().name)
       .on('click', e => select(edge.source()))
-      .appendTo($info)
+      .appendTo($sourceLink)
     $('<div>')
       .text('influences')
       .appendTo($info)
-    $('<div class="textlink"></div>')
+    const $targetLink = $('<div/>')
+      .appendTo($info)
+    $('<span class="link-icon material-symbols-outlined">circle</span>')
+      .appendTo($targetLink)
+    $('<span class="nodelink link"/>')
       .text(edge.target().data().name)
       .on('click', e => select(edge.target()))
-      .appendTo($info)
+      .appendTo($targetLink)
 
     const classified = Object.fromEntries(
       Object.keys(regNames).map(reg => [reg, []])
@@ -448,19 +499,21 @@ function drawGraph(graph) {
         instances.forEach(instance => {
           const $instance = $('<div/>')
             .appendTo($fs)
-          $('<div class="textlink">')
+          $('<span class="link-icon material-symbols-outlined">article</span>')
+            .appendTo($instance)
+          $('<span class="doclink link"/>')
             .text(instance.doc)
             .on('click', evt => displayDoc(instance.doc, instance.brat_ids))
             .appendTo($instance)
           $('<span/>')
             .text(' ' + instance.type)
+            .appendTo($instance)
         })
       })
   }
 
   function displayDoc(doc, newFocus) {
     focus = newFocus
-    console.log(newFocus)
     $('#vis').addClass('show')
     fetch(docDataBase + '/' + doc)
     .then(res => res.json())
