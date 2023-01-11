@@ -31,7 +31,20 @@ const logFactor = 2
 head.js(
   urls.jquery,
   () => head.js(...urls.libraries, onReady)
-);
+)
+
+
+function onResize(selector, debounce, callback) {
+  let resizerTimeout = null;
+  const resizeObserver = new ResizeObserver(entries => {
+    clearTimeout(resizerTimeout)
+    resizerTimeout = setTimeout(callback, debounce, entries)
+  })
+  $(selector).each(function() {
+    resizeObserver.observe(this)
+  })
+  return resizeObserver
+}
 
 
 let dispatcher
@@ -63,19 +76,11 @@ function onReady() {
   const visualizer = new Visualizer(dispatcher, 'brat');
   dispatcher.post('init');
   dispatcher
-    .on('resize', onResize)
     .on('doneRendering', onDoneRendering)
 
-  let resizerTimeout = null;
-  function resizeFunction(evt) {
+  onResize('#vis', 100, evt => {
     dispatcher.post('renderData');
-  }
-  function onResize(evt) {
-    if (evt.target === window) {
-      clearTimeout(resizerTimeout);
-      resizerTimeout = setTimeout(resizeFunction, 100); // TODO is 100ms okay?
-    }
-  }
+  })
 
   function onDoneRendering() {
     if (focus) {
@@ -200,36 +205,56 @@ function drawGraph(graph) {
       cy.width() / 4,
       cy.height() / 4,
     )
+    cy.resize()
   }
-  resize()
-  cy.on('resize', resize)
+  onResize('#graph', 100, resize)
 
-  // XXX DEBUG
+  let canZoomIn = false
+  let isZoomedIn = false
+  function adjustZoomButton() {
+    $('#tab-zoom-in-btn').text(canZoomIn && !isZoomedIn ? 'zoom_in' : 'zoom_out')
+  }
+
   cy.on('select', 'node', function(evt) {
     displayNodeInfo(this)
+    canZoomIn = true
+    adjustZoomButton()
   })
   cy.on('select', 'edge', function(evt) {
     displayEdgeInfo(this)
+    canZoomIn = true
+    adjustZoomButton()
   })
-  cy.on('unselect', '*', evt => displayNodeList())
+  cy.on('unselect', '*', evt => {
+    displayNodeList()
+    canZoomIn = false
+    adjustZoomButton()
+  })
+  // TODO on 'position' of '*:selected', isZoomedIn = false
+  // however it only works for nodes
+  // TODO also, when a different node is selected, isZoomedIn = false
+  // however what if the zoomed in node is selected
 
+  cy.on('viewport', evt => {
+    if (isZoomedIn) {
+      isZoomedIn = false
+      adjustZoomButton()
+    }
+  })
+  $('#tab-zoom-in-btn').on('click', e => {
+    if (canZoomIn && !isZoomedIn) {
+      const selected = cy.elements('*:selected')
+      cy.fit(selected, zoomInMargin)
+      isZoomedIn = true
+      adjustZoomButton()
+    } else {
+      cy.fit(cy.elements(), zoomOutMargin)
+      isZoomedIn = false
+      adjustZoomButton()
+    }
+  })
 
-  $('#tab-zoom-in-btn')
-    .on('click', e => {
-      const oldZoomAndPan = cy.pan()
-      oldZoomAndPan.z = cy.zoom()
-      cy.fit(cy.elements('*:selected'), zoomInMargin)
-      const newZoomAndPan = cy.pan()
-      newZoomAndPan.z = cy.zoom()
-      if (oldZoomAndPan.x == newZoomAndPan.x
-        && oldZoomAndPan.y == newZoomAndPan.y
-        && oldZoomAndPan.z == newZoomAndPan.z
-      ) {
-        cy.fit(cy.elements(), zoomOutMargin)
-      }
-    })
-
-  window.cy = cy // DEBUG
+  // window.cy = cy // DEBUG
 
 
   class Filter {
