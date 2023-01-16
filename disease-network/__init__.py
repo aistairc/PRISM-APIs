@@ -26,8 +26,6 @@ JOB_DIR = Path(os.environ.get('JOB_DIR', './.cache/disease-network')).resolve()
 
 STATUS_FILE_NAME = "status.json"
 OUTPUT_FILE_FOR_GRAPH = "graph.json"
-OUTPUT_FILE_FOR_2D_GRAPH = "2d_graph.json"
-OUTPUT_FILE_FOR_3D_GRAPH = "3d_disease_network.html"
 
 MB = 1024 * 1024
 MAX_CONTENT_LENGTH = 1024 * MB
@@ -91,8 +89,6 @@ def view(job_id):
         page_data={
             "statusURL": url_for(".status", job_id=job_id),
             "graphURL": url_for(".view_disease_network", job_id=job_id),
-            "graph2DURL": url_for(".view_2d_disease_network", job_id=job_id),
-            "graph3DURL": url_for(".view_3d_disease_network", job_id=job_id),
         },
         app_name=frontend.name,
     )
@@ -147,47 +143,8 @@ def view_disease_network(job_id):
     )
 
 
-@frontend.route("/2d_graph_data/<job_id>")
-def fetch_2d_graph_data(job_id):
-    job_dir = JOB_DIR / job_id
-    output_file_path_for_2d_graph = job_dir / OUTPUT_FILE_FOR_2D_GRAPH
-
-    if not output_file_path_for_2d_graph.exists():
-        return redirect(url_for(".index"))
-
-    return send_file(output_file_path_for_2d_graph, max_age=-1)
-
-
-@frontend.route("/2d_disease_network/<job_id>")
-def view_2d_disease_network(job_id):
-    job_dir = JOB_DIR / job_id
-    output_file_path_for_2d_graph = job_dir / OUTPUT_FILE_FOR_2D_GRAPH
-
-    if not output_file_path_for_2d_graph.exists():
-        return redirect(url_for(".index"))
-
-    return render_template(
-        "2d_disease_network_index.html",
-        app_name=frontend.name,
-        graph_data=url_for(".fetch_2d_graph_data", job_id=job_id),
-    )
-
-
-@frontend.route("/3d_disease_network/<job_id>")
-def view_3d_disease_network(job_id):
-    job_dir = JOB_DIR / job_id
-    output_file_path_for_3d_graph = job_dir / OUTPUT_FILE_FOR_3D_GRAPH
-
-    if not output_file_path_for_3d_graph.exists():
-        return redirect(url_for(".index"))
-
-    return send_file(output_file_path_for_3d_graph, max_age=-1)
-
-
 def process_job(job_dir):
     output_file_path_for_graph = job_dir / OUTPUT_FILE_FOR_GRAPH
-    output_file_path_for_2d_graph = job_dir / OUTPUT_FILE_FOR_2D_GRAPH
-    output_file_path_for_3d_graph = job_dir / OUTPUT_FILE_FOR_3D_GRAPH
     status_file_path = job_dir / STATUS_FILE_NAME
 
     docs = [(fn.name, file_utils.read_text(fn)) for fn in job_dir.glob("*.txt")]
@@ -195,8 +152,6 @@ def process_job(job_dir):
     generate_graph_data(
         docs,
         str(output_file_path_for_graph),
-        str(output_file_path_for_2d_graph),
-        str(output_file_path_for_3d_graph),
         status_file_path,
     )
 
