@@ -5,6 +5,7 @@ from queue import Queue
 from tempfile import mkdtemp
 from threading import Thread
 import os
+import json
 
 from disease_network_generator import generate_graph_data, generate_status
 from flask import (
@@ -135,11 +136,26 @@ def view_disease_network(job_id):
     if not output_file_path_for_graph.exists():
         return redirect(url_for(".index"))
 
+    graph_data = json.loads(output_file_path_for_graph.read_text())
+    doc_data_base = url_for(".fetch_doc_data", job_id=job_id, doc_id='')
+    return show_graph(graph_data, doc_data_base)
+
+
+@frontend.route("/graph/show_json", methods=["POST"])
+def show_json():
+    fn = request.files.get("json")
+    if not fn:
+        return redirect(url_for(".index"))
+    graph_data = json.load(fn)
+    return show_graph(graph_data)
+
+
+def show_graph(graph_data, doc_data_base=None):
     return render_template(
         "graph.html",
         app_name=frontend.name,
-        graph_data=url_for(".fetch_graph_data", job_id=job_id),
-        doc_data=url_for(".fetch_doc_data", job_id=job_id, doc_id=''),
+        graph_data=graph_data,
+        doc_data_base=doc_data_base,
     )
 
 

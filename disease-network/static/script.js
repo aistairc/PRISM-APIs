@@ -17,7 +17,7 @@ function checkForResult() {
       progressBarEl.text(`${data.current} / ${data.total}`);
 
       if (data.status === true) {
-        window.location.href = pageData.graphURL;
+        window.location.replace(pageData.graphURL);
       } else {
         setTimeout(checkForResult, CHECK_RESULT_DELAY);
       }

@@ -50,6 +50,10 @@ function onResize(selector, debounce, callback) {
 let dispatcher
 let focus
 function onReady() {
+  if (!docDataBase) {
+    $('#vis').hide()
+  }
+
   Util.loadFonts = function() {};
   window.Configuration = {
     "abbrevsOn": true,
@@ -105,9 +109,7 @@ function onReady() {
     }
   }
 
-  fetch(graphData)
-  .then(res => res.json())
-  .then(drawGraph)
+  drawGraph(graphData)
 }
 
 
@@ -387,7 +389,7 @@ function drawGraph(graph) {
         .appendTo($nodeList)
       $('<span class="link-icon material-symbols-outlined">circle</span>')
         .appendTo($nodeLink)
-      $('<span class="nodelink link"/>')
+      $('<span class="link nodelink"/>')
         .text(node.data('name'))
         .on('click', evt => select(node))
         .appendTo($nodeLink)
@@ -443,7 +445,7 @@ function drawGraph(graph) {
           $('<span class="link-icon material-symbols-outlined"/>')
             .text(icon)
             .appendTo($docLink)
-          $('<span class="link textlink"/>')
+          $('<span class="link edgelink"/>')
             .text(otherNode.data('name'))
             .on('click', evt => select(edge))
             .appendTo($docLink)
@@ -462,7 +464,8 @@ function drawGraph(graph) {
         .appendTo($instances)
       $('<span class="link-icon valign-mid material-symbols-outlined">article</span>')
         .appendTo($instance)
-      $('<span class="link textlink"/>')
+      $('<span/>')
+        .toggleClass('link doclink', !!docDataBase)
         .text(instance.doc)
         .on('click', evt => displayDoc(instance.doc, instance.brat_ids))
         .appendTo($instance)
@@ -526,7 +529,8 @@ function drawGraph(graph) {
             .appendTo($fs)
           $('<span class="link-icon material-symbols-outlined">article</span>')
             .appendTo($instance)
-          $('<span class="doclink link"/>')
+          $('<span/>')
+            .toggleClass('link doclink', !!docDataBase)
             .text(instance.doc)
             .on('click', evt => displayDoc(instance.doc, instance.brat_ids))
             .appendTo($instance)
@@ -538,6 +542,9 @@ function drawGraph(graph) {
   }
 
   function displayDoc(doc, newFocus) {
+    if (!docDataBase) {
+      return
+    }
     focus = newFocus
     $('#vis').addClass('show')
     fetch(docDataBase + '/' + doc)
