@@ -3,6 +3,7 @@ import logging
 
 import plotly.graph_objects as go
 import pandas as pd
+import numpy as np
 
 
 GROUPS = OrderedDict([
@@ -43,9 +44,16 @@ def create_3d_plot(data):
         for coord in ["x", "y", "z"]:
             edges[f"{endpoint}_{coord}"] = nodes[coord][edges[endpoint]].values
     edges["label"] = nodes["name"][edges["source"]].values + " → " + nodes["name"][edges["target"]].values
+    # Compute vectors
     edges["u"] = edges["target_x"] - edges["source_x"]
     edges["v"] = edges["target_y"] - edges["source_y"]
     edges["w"] = edges["target_z"] - edges["source_z"]
+    # Compute unit vectors
+    edges[["u", "v", "w"]] = (
+        edges[["u", "v", "w"]]
+        .apply(lambda vs: vs / np.linalg.norm(vs), axis=1)
+        .fillna(0)
+    )
 
 
     traces = []
@@ -135,7 +143,7 @@ def create_3d_plot(data):
                 y=[edge["target_y"]],
                 z=[edge["target_z"]],
                 u=[edge["u"]],
-                v=[edge["w"]],
+                v=[edge["v"]],
                 w=[edge["w"]],
                 text=[edge["label"]],
                 hoverinfo="text",
