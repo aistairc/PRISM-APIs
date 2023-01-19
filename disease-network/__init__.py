@@ -8,6 +8,7 @@ import os
 import json
 
 from disease_network_generator import generate_graph_data, generate_status
+from disease_network_3d_plot import create_3d_plot_html
 from flask import (
     Blueprint,
     Flask,
@@ -115,6 +116,12 @@ def fetch_graph_data(job_id):
         return redirect(url_for(".index"))
 
     return send_file(output_file_path_for_graph, max_age=-1)
+
+
+@frontend.route("/graph/3d", methods=["POST"])
+def show_3d_graph():
+    data = json.loads(request.form["data"])
+    return create_3d_plot_html(data)
 
 
 @frontend.route("/doc_data/<job_id>/<doc_id>")

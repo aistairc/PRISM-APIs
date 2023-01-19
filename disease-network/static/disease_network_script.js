@@ -404,6 +404,28 @@ function drawGraph(graph) {
     }
   }
 
+  function open3DGraph() {
+    const nodeList = cy.nodes()
+    const nodeMap = {}
+    nodeList.forEach((node, i) => nodeMap[node.id()] = i)
+    const nodes = nodeList.map(node => ({
+      id: nodeMap[node.id()],
+      degree: node.degree(),
+      type: node.data('type'),
+      name: node.data('name'),
+      ...node.position()
+    }))
+    const edges = cy.edges().map(edge => ({
+      source: nodeMap[edge.source().id()],
+      target: nodeMap[edge.target().id()],
+      size: edge.data('instances').length,
+      type: edge.data('type'),
+    }))
+    const data = { nodes, edges }
+    $('#data-for-3d-graph').val(JSON.stringify(data))
+    $('#open-3d-graph-form').submit()
+  }
+
   function displayNodeInfo(node) {
     $('#node-list').hide()
     $('#tab-info-cb').prop('checked', true)
@@ -583,4 +605,5 @@ function drawGraph(graph) {
     window.b = cy.svg()
     evt.target.href = "data:application/json," + encodeURIComponent(cy.svg())
   })
+  $('#open-3d-graph').on('click', open3DGraph)
 }

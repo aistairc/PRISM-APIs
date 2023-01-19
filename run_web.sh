@@ -7,7 +7,7 @@
 FLASK_APP=wsgi flask run --host=0.0.0.0 -p 5002 &
 
 # http://127.0.0.1:5003/disease_network/
-FLASK_APP=disease-network flask run --host=0.0.0.0 -p 5003 &
+# FLASK_APP=disease-network flask run --host=0.0.0.0 -p 5003 &
 
 # http://127.0.0.1:5004/api
 uvicorn api:app --host 0.0.0.0 --port 5004 &
