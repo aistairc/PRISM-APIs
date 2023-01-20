@@ -111,8 +111,9 @@ class DeepEMAnnotator:
 
             try:
                 sentences = self.geniass.split_sentences(doc)
+                newline_free_doc = doc.replace('\n', ' ')
 
-                sentence_standoffs.extend(Standoffizer(doc, sentences))
+                sentence_standoffs.extend(Standoffizer(newline_free_doc, sentences))
 
                 tokenized_sentences = []
                 tokens = []
@@ -122,7 +123,6 @@ class DeepEMAnnotator:
 
                     tokenized_sentences.append(" ".join(tokenized_sentence))
                     tokens.extend(tokenized_sentence)
-
                     token_standoffs.extend(
                         Standoffizer(sentence, tokenized_sentence, sentence_start)
                     )
@@ -560,8 +560,9 @@ class SemELAnnotator:
 
             try:
                 sentences = self.geniass.split_sentences(doc)
+                newline_free_doc = doc.replace('\n', ' ')
 
-                sentence_standoffs.extend(Standoffizer(doc, sentences))
+                sentence_standoffs.extend(Standoffizer(newline_free_doc, sentences))
 
                 tokenized_sentences = []
 
