@@ -315,6 +315,7 @@ function drawGraph(graph) {
   )
   const edgeFilters = [typeFilter, regFilter, docFilter]
 
+
   function singleVal(instances, prop, none, multi) {
     const valList = instances.map(instance => instance[prop])
     const valUniques = [...new Set(valList)]
@@ -324,6 +325,44 @@ function drawGraph(graph) {
       return valUniques.length ? multi : none
     }
   }
+
+
+  function makeDocList() {
+    if (!graph["docs"]) {
+      $('#tab-docs-btn').hide()
+      return
+    }
+    const docCounts = {}
+    for (const doc of Object.keys(graph["docs"])) {
+      docCounts[doc] = 0
+    }
+    cy.edges().each(edge => {
+      for (const instance of edge.data("instances")) {
+        docCounts[instance["doc"]] += 1
+      }
+    })
+    const $list = $('#doc-list').empty()
+    const docs = Object.keys(graph["docs"]).sort()
+    for (const doc of docs) {
+      const ok = graph["docs"][doc]
+      const $docDiv = $('<div/>').appendTo($list)
+      $('<span class="link-icon material-symbols-outlined">article</span>').appendTo($docDiv)
+      const $doc = $('<span/>')
+        .text(doc)
+        .appendTo($docDiv)
+      if (ok) {
+        $doc
+          .addClass('link doclink')
+          .on('click', evt => displayDoc(doc))
+        $('<span/>')
+          .text(` (${docCounts[doc]})`)
+          .appendTo($docDiv)
+      } else {
+        $doc.addClass('bad-doc')
+      }
+    }
+  }
+
 
   let removedNodes = null;
   let removedEdges = null;
@@ -394,8 +433,10 @@ function drawGraph(graph) {
         .on('click', evt => select(node))
         .appendTo($nodeLink)
     }
+    makeDocList()
   }
   filtersChangedHandler()
+
 
   function select(ele) {
     cy.elements('*:selected').unselect()

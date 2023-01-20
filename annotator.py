@@ -109,71 +109,67 @@ class DeepEMAnnotator:
             sentence_standoffs = []
             token_standoffs = []
 
-            try:
-                sentences = self.geniass.split_sentences(doc)
-                newline_free_doc = doc.replace('\n', ' ')
+            sentences = self.geniass.split_sentences(doc)
+            newline_free_doc = doc.replace('\n', ' ')
 
-                sentence_standoffs.extend(Standoffizer(newline_free_doc, sentences))
+            sentence_standoffs.extend(Standoffizer(newline_free_doc, sentences))
 
-                tokenized_sentences = []
-                tokens = []
+            tokenized_sentences = []
+            tokens = []
 
-                for sentence, (sentence_start, _) in zip(sentences, sentence_standoffs):
-                    tokenized_sentence = TOKENIZER.tokenize(sentence)
+            for sentence, (sentence_start, _) in zip(sentences, sentence_standoffs):
+                tokenized_sentence = TOKENIZER.tokenize(sentence)
 
-                    tokenized_sentences.append(" ".join(tokenized_sentence))
-                    tokens.extend(tokenized_sentence)
-                    token_standoffs.extend(
-                        Standoffizer(sentence, tokenized_sentence, sentence_start)
-                    )
-
-                if len(tokenized_sentences) == 0:
-                    return annotator, sentence_standoffs, token_standoffs
-
-                tokenized_doc = "\n".join(tokenized_sentences)
-
-                offset_map = dict(
-                    zip(
-                        itertools.chain.from_iterable(
-                            Standoffizer(tokenized_doc, tokens)
-                        ),
-                        itertools.chain.from_iterable(token_standoffs),
-                    )
+                tokenized_sentences.append(" ".join(tokenized_sentence))
+                tokens.extend(tokenized_sentence)
+                token_standoffs.extend(
+                    Standoffizer(sentence, tokenized_sentence, sentence_start)
                 )
 
-                file_utils.make_dirs(self.input_dir)
-                file_utils.make_dirs(self.output_dir)
+            if len(tokenized_sentences) == 0:
+                return annotator, sentence_standoffs, token_standoffs
 
-                with tempfile.TemporaryDirectory(
-                    dir=self.input_dir
-                ) as input_dir, tempfile.TemporaryDirectory(
-                    dir=self.output_dir
-                ) as output_dir:
-                    sample_filename = "sample"
+            tokenized_doc = "\n".join(tokenized_sentences)
 
-                    file_utils.write_text(
-                        tokenized_doc, os.path.join(input_dir, sample_filename + ".txt")
-                    )
-                    file_utils.write_lines(
-                        [], os.path.join(input_dir, sample_filename + ".ann")
-                    )
+            offset_map = dict(
+                zip(
+                    itertools.chain.from_iterable(
+                        Standoffizer(tokenized_doc, tokens)
+                    ),
+                    itertools.chain.from_iterable(token_standoffs),
+                )
+            )
 
-                    process_dir(
-                        self.model, self.parameters, input_dir + "/", output_dir + "/"
-                    )
+            file_utils.make_dirs(self.input_dir)
+            file_utils.make_dirs(self.output_dir)
 
-                    prediction_dir = os.path.join(output_dir, "ev-last/ev-ann")
+            with tempfile.TemporaryDirectory(
+                dir=self.input_dir
+            ) as input_dir, tempfile.TemporaryDirectory(
+                dir=self.output_dir
+            ) as output_dir:
+                sample_filename = "sample"
 
-                    if not os.path.isdir(prediction_dir):
-                        prediction_dir = os.path.join(output_dir, "rel-last/rel-ann")
+                file_utils.write_text(
+                    tokenized_doc, os.path.join(input_dir, sample_filename + ".txt")
+                )
+                file_utils.write_lines(
+                    [], os.path.join(input_dir, sample_filename + ".ann")
+                )
 
-                    with TextAnnotations(
-                        document=os.path.join(prediction_dir, sample_filename)
-                    ) as prediction:
-                        self.__fix_annotations(annotator, prediction, offset_map)
+                process_dir(
+                    self.model, self.parameters, input_dir + "/", output_dir + "/"
+                )
 
-            except Exception as ex:
-                logger.exception(ex)
+                prediction_dir = os.path.join(output_dir, "ev-last/ev-ann")
+
+                if not os.path.isdir(prediction_dir):
+                    prediction_dir = os.path.join(output_dir, "rel-last/rel-ann")
+
+                with TextAnnotations(
+                    document=os.path.join(prediction_dir, sample_filename)
+                ) as prediction:
+                    self.__fix_annotations(annotator, prediction, offset_map)
 
             return annotator, sentence_standoffs, token_standoffs
 
@@ -558,44 +554,40 @@ class SemELAnnotator:
             sentence_standoffs = []
             token_standoffs = []
 
-            try:
-                sentences = self.geniass.split_sentences(doc)
-                newline_free_doc = doc.replace('\n', ' ')
+            sentences = self.geniass.split_sentences(doc)
+            newline_free_doc = doc.replace('\n', ' ')
 
-                sentence_standoffs.extend(Standoffizer(newline_free_doc, sentences))
+            sentence_standoffs.extend(Standoffizer(newline_free_doc, sentences))
 
-                tokenized_sentences = []
+            tokenized_sentences = []
 
-                offset_maps = []
+            offset_maps = []
 
-                for sentence, (sentence_start, _) in zip(sentences, sentence_standoffs):
-                    tokenized_sentence = TOKENIZER.tokenize(sentence)
+            for sentence, (sentence_start, _) in zip(sentences, sentence_standoffs):
+                tokenized_sentence = TOKENIZER.tokenize(sentence)
 
-                    tokenized_sentences.append(tokenized_sentence)
+                tokenized_sentences.append(tokenized_sentence)
 
-                    sentence_token_standoffs = list(
-                        Standoffizer(sentence, tokenized_sentence, sentence_start)
-                    )
+                sentence_token_standoffs = list(
+                    Standoffizer(sentence, tokenized_sentence, sentence_start)
+                )
 
-                    token_standoffs.extend(sentence_token_standoffs)
+                token_standoffs.extend(sentence_token_standoffs)
 
-                    offset_maps.append(sentence_token_standoffs)
+                offset_maps.append(sentence_token_standoffs)
 
-                if len(tokenized_sentences) == 0:
-                    return annotator, sentence_standoffs, token_standoffs
+            if len(tokenized_sentences) == 0:
+                return annotator, sentence_standoffs, token_standoffs
 
-                prediction = self.ner_predictor(tokenized_sentences)
+            prediction = self.ner_predictor(tokenized_sentences)
 
-                if self.enable_linking:
-                    prediction = self.cg_predictor(prediction)
-                    prediction = self.cr_predictor(prediction)
+            if self.enable_linking:
+                prediction = self.cg_predictor(prediction)
+                prediction = self.cr_predictor(prediction)
 
-                prediction = prediction["sample.ann"]
+            prediction = prediction["sample.ann"]
 
-                self.__fix_annotations(annotator, prediction, offset_maps)
-
-            except Exception as ex:
-                logger.exception(ex)
+            self.__fix_annotations(annotator, prediction, offset_maps)
 
             return annotator, sentence_standoffs, token_standoffs
 

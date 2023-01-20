@@ -52,6 +52,7 @@
   <div id="container">
     <input id="tab-about-cb" type="radio" name="tab-selector" class="tab-selector" checked value="about">
     <input id="tab-info-cb" type="radio" name="tab-selector" class="tab-selector" value="info">
+    <input id="tab-docs-cb" type="radio" name="tab-selector" class="tab-selector" value="docs">
     <input id="tab-filters-cb" type="radio" name="tab-selector" class="tab-selector" value="filters">
     <input id="tab-export-cb" type="radio" name="tab-selector" class="tab-selector" value="export">
     <input id="tab-close-cb" type="radio" name="tab-selector" class="tab-selector" value="close">
@@ -62,6 +63,9 @@
       </label>
       <label id="tab-info-btn" for="tab-info-cb" class="material-symbols-outlined">
         info
+      </label>
+      <label id="tab-docs-btn" for="tab-docs-cb" class="material-symbols-outlined">
+        article
       </label>
       <label id="tab-filters-btn" for="tab-filters-cb" class="material-symbols-outlined">
         tune
@@ -92,6 +96,14 @@
         <div id="node-list">
         </div>
         <div id="info">
+        </div>
+      </section>
+
+      <section id="tab-docs-pane" class="sidebar-tab">
+        <h2>
+          Document List
+        </h2>
+        <div id="doc-list">
         </div>
       </section>
 

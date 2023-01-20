@@ -55,7 +55,9 @@ EXTERNAL_API_BASE_URL = os.environ.get('EXTERNAL_API_BASE_URL', 'http://127.0.0.
 def annotate(task, doc):
     try:
         uri = f"{EXTERNAL_API_BASE_URL}/{task}/annotate"
+        logger.debug(f"API call to {task}")
         res = requests.post(uri, data={"text": doc})
+        logger.debug(f"API call to {task} done")
 
         res.raise_for_status()
 
@@ -78,10 +80,9 @@ def annotate(task, doc):
         events = [EVENT(*e, Regulation.for_type(ev_entity_map[e[1]]), attribute_map[e[0]]) for e in events]
 
         return entities, norms, cuis, events, annotations
-    except requests.HTTPError as ex:
+    except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError) as ex:
         logger.exception(ex)
-
-    return [], [], {}, []
+        raise # maybe choose more appropriate exception
 
 
 class RegulationSquasher:
@@ -296,6 +297,7 @@ def generate_graph_data(
     max_args = 0
     all_events = []
     doc_anns = {}
+    doc_ok = {}
     regulation_squasher = RegulationSquasher()
 
     for doc_idx, (doc_name, doc) in enumerate(docs, start=1):
@@ -313,10 +315,17 @@ def generate_graph_data(
             # TODO make sure `annotate` detects regulation
 
         else:
-            el_entities, el_norms, el_cuis, _, _ = annotate("entity_linking", doc)
-            ev_entities, _, _, ev_events, anns = annotate("event_extraction", doc)
+            try:
+                el_entities, el_norms, el_cuis, _, _ = annotate("entity_linking", doc)
+                ev_entities, _, _, ev_events, anns = annotate("event_extraction", doc)
+            except:
+                logger.debug(f"There was an error annotating {doc_name}")
+                doc_ok[doc_name] = False
+                continue
+
             doc_anns[doc_name] = anns
 
+        logger.debug(f"Successfully annotated {doc_name}")
         norm_map = {}
 
         entities = {e.id: e for e in el_entities}
@@ -351,9 +360,11 @@ def generate_graph_data(
             entities[e_id] = entities[e_id]._replace(text=doc[span_start:span_end])
 
         regulation_squasher.add(doc_name, entities, events)
+        doc_ok[doc_name] = True
         generate_status(doc_idx, len(docs), False, status_file)
 
     graph = regulation_squasher.graph_data()
+    graph["docs"] = doc_ok
 
     file_utils.write_json(graph, output_file_for_graph)
 
