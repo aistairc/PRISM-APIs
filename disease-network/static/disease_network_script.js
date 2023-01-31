@@ -205,6 +205,14 @@ function drawGraph(graph) {
           'underlay-padding': 5,
           'underlay-shape': 'ellipse',
           'underlay-opacity': 1,
+          'z-index': 1001,
+        },
+      },
+      {
+        selector: 'node:selected',
+        style: {
+          'text-outline-color': 'gold',
+          'text-outline-width': 2,
         },
       },
       {
@@ -214,6 +222,14 @@ function drawGraph(graph) {
           'underlay-padding': 5,
           'underlay-shape': 'ellipse',
           'underlay-opacity': 1,
+          'z-index': 1000,
+        },
+      },
+      {
+        selector: 'node.neighborhood',
+        style: {
+          'text-outline-color': 'yellow',
+          'text-outline-width': 1,
         },
       },
     ],
