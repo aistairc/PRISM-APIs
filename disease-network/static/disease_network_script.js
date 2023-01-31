@@ -174,33 +174,6 @@ function drawGraph(graph) {
           'background-color': color,
         }
       })),
-      /*
-      {
-        selector: 'node[type="..."]',
-        style: {
-          'background-color': 'magenta',
-        }
-      },
-      {
-        selector: 'node[type="Disorder"]',
-        style: {
-          'background-color': 'red',
-        }
-      },
-      {
-        selector: 'node[type="GGPs"]',
-        style: {
-          'background-color': 'purple',
-        }
-      },
-      {
-        selector: 'node[type="Pharmacological_substance"]',
-        style: {
-          'background-color': 'green',
-        }
-      },
-      */
-
       {
         selector: 'edge',
         style: {
@@ -227,6 +200,15 @@ function drawGraph(graph) {
       })),
       {
         selector: '*:selected',
+        style: {
+          'underlay-color': 'gold',
+          'underlay-padding': 5,
+          'underlay-shape': 'ellipse',
+          'underlay-opacity': 1,
+        },
+      },
+      {
+        selector: '*.neighborhood',
         style: {
           'underlay-color': 'yellow',
           'underlay-padding': 5,
@@ -257,16 +239,20 @@ function drawGraph(graph) {
   }
 
   cy.on('select', 'node', function(evt) {
+    cy.nodes(":selected").neighborhood().addClass('neighborhood')
     displayNodeInfo(this)
     canZoomIn = true
     adjustZoomButton()
   })
   cy.on('select', 'edge', function(evt) {
+    cy.edges(":selected").source().addClass('neighborhood')
+    cy.edges(":selected").target().addClass('neighborhood')
     displayEdgeInfo(this)
     canZoomIn = true
     adjustZoomButton()
   })
   cy.on('unselect', '*', evt => {
+    cy.elements("*.neighborhood").removeClass('neighborhood')
     displayNodeList()
     canZoomIn = false
     adjustZoomButton()
