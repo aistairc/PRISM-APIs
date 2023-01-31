@@ -18,10 +18,14 @@ const regColors = {
   1: "#6c6",
   2: "#660",
 }
-
 const nodeColors = {
-  Disorder: "#fa0",
+  "Disorder": "red",
+  "GGPs": "purple",
+  "Pharmacological_substance": "green",
+  "...": "magenta",
+  "default": "blue",
 }
+
 
 const minEdgeWidth = 3
 const maxEdgeWidth = 10
@@ -44,6 +48,14 @@ function onResize(selector, debounce, callback) {
     resizeObserver.observe(this)
   })
   return resizeObserver
+}
+
+function nameComparator(a, b) {
+  let aa = a.data('name')
+  let bb = b.data('name')
+  if (aa.charAt(0) == '"') aa = aa.substring(1, aa.length - 2)
+  if (bb.charAt(0) == '"') bb = bb.substring(1, aa.length - 2)
+  return aa.localeCompare(bb)
 }
 
 
@@ -109,6 +121,11 @@ function onReady() {
     }
   }
 
+  Object.entries(nodeColors).forEach(([type, color]) => {
+    $(`#entity-legend [data-type="${type}"]`).css('color', color)
+  })
+  $('#entity-legend').removeClass('hidden')
+
   drawGraph(graphData)
 }
 
@@ -119,7 +136,9 @@ function drawGraph(graph) {
   cy = cytoscape({
     container: document.getElementById('graph'),
     layout: {
-      name: 'cose',
+      name: 'fcose',
+      quality: 'proof',
+
     },
     responsive: true,
     elements: {
@@ -142,13 +161,20 @@ function drawGraph(graph) {
       {
         selector: 'node',
         style: {
-          'background-color': 'blue',
+          'background-color': nodeColors.default,
           'font-size': 7,
           height: 10,
           width: 10,
           label: 'data(name)',
         }
       },
+      ...Object.entries(nodeColors).map(([type, color]) => ({
+        selector: `node[type="${type}"]`,
+        style: {
+          'background-color': color,
+        }
+      })),
+      /*
       {
         selector: 'node[type="..."]',
         style: {
@@ -161,6 +187,19 @@ function drawGraph(graph) {
           'background-color': 'red',
         }
       },
+      {
+        selector: 'node[type="GGPs"]',
+        style: {
+          'background-color': 'purple',
+        }
+      },
+      {
+        selector: 'node[type="Pharmacological_substance"]',
+        style: {
+          'background-color': 'green',
+        }
+      },
+      */
 
       {
         selector: 'edge',
@@ -264,6 +303,7 @@ function drawGraph(graph) {
       this.prop = prop
       items = items.map(item => Array.isArray(item) ? item : [item, item])
       this.filter = Object.fromEntries(items.map(([value, name]) => [value, true]))
+      this.$counters = []
       for (const [value, name] of items) {
         const $label = $('<label/>')
           .appendTo($element)
@@ -274,14 +314,33 @@ function drawGraph(graph) {
             callback()
           })
           .appendTo($label)
-        const $text = $('<span/>')
-          .text(name)
+        $('<span/>')
+          .text(name + " (")
+          .appendTo($label)
+        this.$counters[value] = $('<span class="count"/>')
+          .appendTo($label)
+        $('<span>)</span>')
           .appendTo($label)
       }
     }
 
+    updateCounter(filteredInstances) {
+      const counts = {}
+      for (const instance of filteredInstances) {
+        counts[instance[this.prop]] ??= 0
+        counts[instance[this.prop]] += 1
+      }
+      Object.entries(this.$counters).forEach(([value, $counter]) => {
+        $counter.text(counts[value] ?? 0)
+      })
+    }
+
     applyTo(instances) {
       return instances.filter(instance => this.filter[instance[this.prop]])
+    }
+
+    static updateCounters(filteredInstances, filters) {
+      filters.forEach(filter => filter.updateCounter(filteredInstances))
     }
 
     static applyTo(instances, filters) {
@@ -298,22 +357,35 @@ function drawGraph(graph) {
     items.sort()
     return items
   }
+
+  function plural(num) {
+    if (Array.isArray(num)) {
+      num = num.length
+    }
+    return num % 10 !== 1 || num % 100 === 11
+  }
   
   const allEdgeInstances = cy.edges().map(item => item.data('instances')).flat()
+  const allNodeInstances = cy.nodes().map(item => item.data('instances')).flat()
 
-  const typeFilter = new Filter(
-    uniquePropValues(allEdgeInstances, 'type'),
-    'type', $('#relation-filters'), filtersChangedHandler
-  )
   const regFilter = new Filter(
     uniquePropValues(allEdgeInstances, 'regulation').map(reg => [reg, regNames[reg]]),
     'regulation', $('#regulation-filters'), filtersChangedHandler
+  )
+  const eventFilter = new Filter(
+    uniquePropValues(allEdgeInstances, 'type'),
+    'type', $('#event-filters'), filtersChangedHandler
+  )
+  const entityFilter = new Filter(
+    uniquePropValues(allNodeInstances, 'type'),
+    'type', $('#entity-filters'), filtersChangedHandler
   )
   const docFilter = new Filter(
     uniquePropValues(allEdgeInstances, 'doc'),
     'doc', $('#document-filters'), filtersChangedHandler
   )
-  const edgeFilters = [typeFilter, regFilter, docFilter]
+  const edgeFilters = [regFilter, eventFilter, docFilter]
+  const nodeFilters = [entityFilter, docFilter]
 
 
   function singleVal(instances, prop, none, multi) {
@@ -387,8 +459,34 @@ function drawGraph(graph) {
       edge.data(edgeData)
     })
 
-    removedEdges = cy.remove(cy.edges().filter(edge => !edge.data('filteredInstances').length))
-    removedNodes = cy.remove(cy.nodes().filter('[[degree = 0]]'))
+    cy.nodes().forEach(node => {
+      const nodeData = node.data()
+      nodeData.filteredInstances = Filter.applyTo(nodeData.instances, nodeFilters)
+      nodeData.doc = singleVal(nodeData.filteredInstances, 'doc', "", "...")
+      nodeData.type = singleVal(nodeData.filteredInstances, 'type', "", "...")
+      node.data(nodeData)
+    })
+
+    // removedEdges = cy.remove(cy.edges().filter(edge => !edge.data('filteredInstances').length))
+    removedEdges = cy.remove(cy.edges().filter(edge => !(
+      edge.data('filteredInstances').length
+      && edge.source().data('filteredInstances').length
+      && edge.target().data('filteredInstances').length
+    )))
+    // removedNodes = cy.remove(cy.nodes().filter('[[degree = 0]]'))
+    removedNodes = cy.remove(cy.nodes().filter(node => !(
+      node.degree()
+      && node.data('filteredInstances').length
+    )))
+
+    Filter.updateCounters(
+      cy.nodes().map(node => node.data('filteredInstances')).flat(),
+      nodeFilters,
+    )
+    Filter.updateCounters(
+      cy.edges().map(edge => edge.data('filteredInstances')).flat(),
+      edgeFilters,
+    )
 
     let scale
     if (maxInstances * logFactor <= maxEdgeWidth - minEdgeWidth + 1) {
@@ -404,21 +502,7 @@ function drawGraph(graph) {
       edge.data('width', width)
     })
 
-    cy.nodes().forEach(node => {
-      const nodeData = node.data()
-      nodeData.filteredInstances = docFilter.applyTo(nodeData.instances)
-      nodeData.doc = singleVal(nodeData.filteredInstances, 'doc', "", "...")
-      nodeData.type = singleVal(nodeData.filteredInstances, 'type', "", "...")
-      node.data(nodeData)
-    })
-
-    const nodeList = cy.nodes().sort((a, b) => {
-      let aa = a.data('name')
-      let bb = b.data('name')
-      if (aa.charAt(0) == '"') aa = aa.substring(1, aa.length - 2)
-      if (bb.charAt(0) == '"') bb = bb.substring(1, aa.length - 2)
-      return aa.localeCompare(bb)
-    })
+    const nodeList = cy.nodes().sort(nameComparator)
     const $nodeList = $('#node-list').empty()
     $('<h2/>')
       .text('Node List')
@@ -489,6 +573,18 @@ function drawGraph(graph) {
         .text(nodeData.cui)
         .appendTo($dbLink)
     }
+
+    const types = uniquePropValues(nodeData.filteredInstances, 'type')
+    const $typeFs = $('<fieldset/>')
+      .appendTo($info)
+    $('<legend/>')
+      .text(plural(types) ? "Types" : "Type")
+      .appendTo($typeFs)
+    types.forEach(type => {
+      $('<div/>')
+        .text(type)
+        .appendTo($typeFs)
+    })
 
     ![
       [node.outgoers().edges(), "Influences", "target", "line_end_arrow"],
@@ -573,6 +669,18 @@ function drawGraph(graph) {
       .text(edge.target().data().name)
       .on('click', e => select(edge.target()))
       .appendTo($targetLink)
+
+    const types = uniquePropValues(edgeData.filteredInstances, 'type')
+    const $typeFs = $('<fieldset/>')
+      .appendTo($info)
+    $('<legend/>')
+      .text(plural(types) ? "Types" : "Type")
+      .appendTo($typeFs)
+    types.forEach(type => {
+      $('<div/>')
+        .text(type)
+        .appendTo($typeFs)
+    })
 
     const classified = Object.fromEntries(
       Object.keys(regNames).map(reg => [reg, []])
