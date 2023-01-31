@@ -19,6 +19,8 @@ GROUP_MAPPING = { t: g for g, ts in GROUPS.items() for t in ts }
 GROUP_NAMES = list(GROUPS.keys())
 GROUP_INDICES = defaultdict(lambda: len(GROUP_NAMES) - 1, { k: i for i, k in enumerate(GROUP_NAMES) })
 GROUP_COLORS = ["#f9c74f", "#f8961e", "#f3722c", "#90be6d", "#43aa8b", "#000000"]
+SIZE_MIN = 20
+SIZE_MAX = 40
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +77,8 @@ def create_3d_plot(data):
         )
 
         # Create nodes
+        sizes = np.log2(nodes["degree"])
+        sizes = (sizes * (SIZE_MAX - SIZE_MIN) / sizes.max()) + SIZE_MIN
         trace_nodes = nodes[nodes["group_index"] == group_index]
         traces.append(
             go.Scatter3d(
@@ -93,7 +97,7 @@ def create_3d_plot(data):
                     color="#e63946",
                     opacity=1.0,
                     sizemode="diameter",
-                    size=nodes["degree"] * 2 + 20,
+                    size=sizes,
                     line=dict(color="#000000", width=1),
                 ),
             )
