@@ -190,6 +190,11 @@ function drawGraph(graph) {
           'target-arrow-shape': 'triangle',
           'line-opacity': 0.5,
           'curve-style': 'straight',
+        }
+      },
+      {
+        selector: 'edge[width]',
+        style: {
           width: 'data(width)',
         }
       },
