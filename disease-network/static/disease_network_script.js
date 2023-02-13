@@ -235,6 +235,7 @@ function drawGraph(graph) {
     ],
   })
   cy.remove(cy.nodes().filter('[[degree = 0]]'))
+  const fullGraphJSON = cy.json()
 
   // TODO XXX not really working
   let zoomInMargin
@@ -789,8 +790,11 @@ function drawGraph(graph) {
   }
 
 
+  $('#download-json-full').on('click contextmenu', evt => {
+    evt.target.href = "data:application/json," + encodeURIComponent(JSON.stringify(fullGraphJSON, null, 2))
+  })
   $('#download-json').on('click contextmenu', evt => {
-    evt.target.href = "data:application/json," + encodeURIComponent(JSON.stringify(graph, null, 2))
+    evt.target.href = "data:application/json," + encodeURIComponent(JSON.stringify(cy.json(), null, 2))
   })
   $('#download-png').on('click contextmenu', evt => {
     evt.target.href = cy.png()
