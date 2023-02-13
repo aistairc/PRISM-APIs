@@ -154,3 +154,13 @@ html h2 {
 .hidden {
   display: none;
 }
+
+#subgraph-filter {
+  display: flex;
+  white-space: nowrap;
+  justify-content: space-between;
+}
+
+#subgraph-filter input {
+  width: 50px;
+}

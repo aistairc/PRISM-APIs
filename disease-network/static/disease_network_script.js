@@ -366,7 +366,7 @@ function drawGraph(graph) {
     }
     return num % 10 !== 1 || num % 100 === 11
   }
-  
+
   const allEdgeInstances = cy.edges().map(item => item.data('instances')).flat()
   const allNodeInstances = cy.nodes().map(item => item.data('instances')).flat()
 
@@ -388,6 +388,7 @@ function drawGraph(graph) {
   )
   const edgeFilters = [regFilter, eventFilter, docFilter]
   const nodeFilters = [entityFilter, docFilter]
+  $('#subgraph-filter input').on('input', filtersChangedHandler)
 
 
   /*
@@ -412,8 +413,6 @@ function drawGraph(graph) {
         maxVal = instance[prop]
       }
     }
-    console.log(tally)
-    console.log(maxVal)
     return maxVal ?? none
   }
 
@@ -454,11 +453,32 @@ function drawGraph(graph) {
     }
   }
 
+  function getDisjointSubgraphs() {
+    let subgraphs = {}
+    cy.nodes().forEach(node => {
+      if (!(node.id() in subgraphs)) {
+        const subgraph = []
+        cy.elements().dfs({
+          roots: [node],
+          visit: function(v, e, u, i, d) {
+            const id = v.id()
+            subgraphs[id] = subgraph
+            subgraph.push(id)
+          },
+          directed: false,
+        })
+      }
+    })
+    return subgraphs
+  }
 
+
+  let removedSubgraphs = null;
   let removedNodes = null;
   let removedEdges = null;
   function filtersChangedHandler() {
     if (removedEdges) {
+      cy.add(removedSubgraphs)
       cy.add(removedNodes)
       cy.add(removedEdges)
     }
@@ -497,6 +517,12 @@ function drawGraph(graph) {
       node.degree()
       && node.data('filteredInstances').length
     )))
+
+    const subgraphs = getDisjointSubgraphs()
+    const minSubgraphSize = +$('#subgraph-filter input').val()
+    removedSubgraphs = cy.remove(cy.nodes().filter(node =>
+      subgraphs[node.id()].length < minSubgraphSize)
+    )
 
     Filter.updateCounters(
       cy.nodes().map(node => node.data('filteredInstances')).flat(),
