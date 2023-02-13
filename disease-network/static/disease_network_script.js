@@ -390,6 +390,7 @@ function drawGraph(graph) {
   const nodeFilters = [entityFilter, docFilter]
 
 
+  /*
   function singleVal(instances, prop, none, multi) {
     const valList = instances.map(instance => instance[prop])
     const valUniques = [...new Set(valList)]
@@ -398,6 +399,22 @@ function drawGraph(graph) {
     } else {
       return valUniques.length ? multi : none
     }
+  }
+  */
+  function singleVal(instances, prop, none, multi) {
+    // pick a max value
+    const tally = {}
+    let maxVal
+    for (const instance of instances) {
+      tally[instance[prop]] ??= 0
+      tally[instance[prop]]++
+      if (tally[instance[prop]] > (tally[maxVal] ?? 0)) {
+        maxVal = instance[prop]
+      }
+    }
+    console.log(tally)
+    console.log(maxVal)
+    return maxVal ?? none
   }
 
 
