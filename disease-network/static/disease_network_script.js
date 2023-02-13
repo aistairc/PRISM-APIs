@@ -38,12 +38,16 @@ head.js(
 )
 
 
-function onResize(selector, debounce, callback) {
-  let resizerTimeout = null;
-  const resizeObserver = new ResizeObserver(entries => {
-    clearTimeout(resizerTimeout)
-    resizerTimeout = setTimeout(callback, debounce, entries)
-  })
+function debounce(timeout=250, fn) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => fn.apply(this, args), timeout);
+  }
+}
+
+function onResize(selector, callback) {
+  const resizeObserver = new ResizeObserver(callback)
   $(selector).each(function() {
     resizeObserver.observe(this)
   })
@@ -94,9 +98,13 @@ function onReady() {
   dispatcher
     .on('doneRendering', onDoneRendering)
 
-  onResize('#vis', 100, evt => {
-    dispatcher.post('renderData');
-  })
+  onResize(
+    '#vis',
+    debounce(
+      100,
+      evt => dispatcher.post('renderData'),
+    ),
+  )
 
   function onDoneRendering() {
     if (focus) {
@@ -247,7 +255,8 @@ function drawGraph(graph) {
     )
     cy.resize()
   }
-  onResize('#graph', 100, resize)
+  resize = debounce(100, resize)
+  onResize('#graph', resize)
 
   let canZoomIn = false
   let isZoomedIn = false
@@ -368,28 +377,29 @@ function drawGraph(graph) {
     return num % 10 !== 1 || num % 100 === 11
   }
 
+  const debouncedFiltersChangedHandler = debounce(250, filtersChangedHandler)
   const allEdgeInstances = cy.edges().map(item => item.data('instances')).flat()
   const allNodeInstances = cy.nodes().map(item => item.data('instances')).flat()
 
   const regFilter = new Filter(
     uniquePropValues(allEdgeInstances, 'regulation').map(reg => [reg, regNames[reg]]),
-    'regulation', $('#regulation-filters'), filtersChangedHandler
+    'regulation', $('#regulation-filters'), debouncedFiltersChangedHandler
   )
   const eventFilter = new Filter(
     uniquePropValues(allEdgeInstances, 'type'),
-    'type', $('#event-filters'), filtersChangedHandler
+    'type', $('#event-filters'), debouncedFiltersChangedHandler
   )
   const entityFilter = new Filter(
     uniquePropValues(allNodeInstances, 'type'),
-    'type', $('#entity-filters'), filtersChangedHandler
+    'type', $('#entity-filters'), debouncedFiltersChangedHandler
   )
   const docFilter = new Filter(
     uniquePropValues(allEdgeInstances, 'doc'),
-    'doc', $('#document-filters'), filtersChangedHandler
+    'doc', $('#document-filters'), debouncedFiltersChangedHandler
   )
   const edgeFilters = [regFilter, eventFilter, docFilter]
   const nodeFilters = [entityFilter, docFilter]
-  $('#subgraph-filter input').on('input', filtersChangedHandler)
+  $('#subgraph-filter input').on('input', debouncedFiltersChangedHandler)
 
 
   /*

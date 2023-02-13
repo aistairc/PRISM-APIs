@@ -39,6 +39,15 @@
 
   <div id="main-container" class="container-fluid">
     <main role="main" class="bd-content row">
+      <p class="col-md-12 page">
+        This application extracts causal relationships from biomedical texts as
+        a graph. You can paste in a single text, as well as upload multiple
+        text (<code>.txt</code>) files. The processing is queued, and the
+        submitted texts will be stored on the server; the texts will not be
+        used for any other purpose, and will be deleted one week after the
+        processing is completed.
+      </p>
+
       <form method="POST" class="col-md-12 page" action="{{ url_for('.submit') }}">
         <div class="form-group">
           <textarea id="text" name="text" class="form-control" rows="15" placeholder="Enter text here" required></textarea>
@@ -80,7 +89,7 @@
 
   <footer class="footer font-small text-muted bg-dark">
     <div class="footer-copyright text-center py-3">
-      <div>Version 0.1</div>
+      <div>Version 0.2</div>
       <div>
         <a href="https://www.airc.aist.go.jp/en/kirt/">Knowledge and Information Research Team (KIRT)</a>
       </div>
