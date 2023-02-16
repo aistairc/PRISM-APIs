@@ -105,15 +105,17 @@ class RegulationSquasher:
             node = self.node_key_map.get(node_key)
             if not node:
                 node = {
-                    "id": len(self.node_list),
-                    "name": entity.canonical_name or f'"{entity.text}"',
-                    "instances": [],
-                    "cui": entity.umls_id,
-                    "url": entity.umls_id and "https://uts.nlm.nih.gov/uts/umls/searchResults?searchString=" + entity.umls_id,
+                    "data": {
+                        "id": f"n{len(self.node_list)}",
+                        "name": entity.canonical_name or f'"{entity.text}"',
+                        "instances": [],
+                        "cui": entity.umls_id,
+                        "url": entity.umls_id and "https://uts.nlm.nih.gov/uts/umls/searchResults?searchString=" + entity.umls_id,
+                    },
                 }
                 self.node_list.append(node)
                 self.node_key_map[node_key] = node
-            node["instances"].append({
+            node["data"]["instances"].append({
                 "doc": doc_name,
                 "brat_ids": [[entity.id]],
                 "type": entity.type,
@@ -233,26 +235,28 @@ class RegulationSquasher:
                     continue
 
                 _, antecedent_node, consequent_node, regulation, consequent_type, brat_ids = event_descriptor
-                link_key = (antecedent_node["id"], consequent_node["id"])
+                link_key = (antecedent_node["data"]["id"], consequent_node["data"]["id"])
                 link = self.link_key_map.get(link_key)
                 if not link:
                     link = {
-                        "id": len(self.link_list),
-                        "source": antecedent_node["id"],
-                        "target": consequent_node["id"],
-                        "instances": [],
+                        "data": {
+                            "id": f"e{len(self.link_list)}",
+                            "source": antecedent_node["data"]["id"],
+                            "target": consequent_node["data"]["id"],
+                            "instances": [],
+                        },
                     }
                     self.link_key_map[link_key] = link
                     self.link_list.append(link)
 
-                    # see if there is an edge going the other way
-                    rev_link_key = (consequent_node["id"], antecedent_node["id"])
-                    rev_link = self.link_key_map.get(rev_link_key)
-                    if rev_link:
-                        link["bidir"] = 0
-                        rev_link["bidir"] = 1
+                    # # see if there is an edge going the other way
+                    # rev_link_key = (consequent_node["data"]["id"], antecedent_node["data"]["id"])
+                    # rev_link = self.link_key_map.get(rev_link_key)
+                    # if rev_link:
+                    #     link["bidir"] = 0
+                    #     rev_link["bidir"] = 1
 
-                link["instances"].append({
+                link["data"]["instances"].append({
                     "type": consequent_type,
                     "regulation": regulation,
                     "doc": doc_name,
@@ -262,7 +266,7 @@ class RegulationSquasher:
     def graph_data(self):
         used_node_brat_ids = set()
         for link in self.link_list:
-            for instance in link["instances"]:
+            for instance in link["data"]["instances"]:
                 antecedent = instance["brat_ids"][0][0]
                 consequent = instance["brat_ids"][-1][0]
                 doc = instance["doc"]
@@ -270,16 +274,16 @@ class RegulationSquasher:
                 used_node_brat_ids.add((doc, consequent))
 
         for node in self.node_list:
-            node["instances"] = [
-                instance for instance in node["instances"]
+            node["data"]["instances"] = [
+                instance for instance in node["data"]["instances"]
                 if (instance["doc"], instance["brat_ids"][0][0]) in used_node_brat_ids
             ]
 
-        self.node_list = [node for node in self.node_list if node["instances"]]
+        self.node_list = [node for node in self.node_list if node["data"]["instances"]]
 
         return {
             "nodes": self.node_list,
-            "links": self.link_list,
+            "edges": self.link_list,
         }
 
 

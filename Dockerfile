@@ -6,7 +6,7 @@ ARG USER_UID
 ARG USER_GID
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 USER_UID=$USER_UID USER_GID=$USER_GID
 
-COPY ./requirements.txt .
+COPY --chown="$USER_UIR":"$USER_GID" ./requirements.txt .
 
 RUN apt-get update \
     && apt-get -y install build-essential perl ruby \
@@ -15,6 +15,8 @@ RUN apt-get update \
 
 COPY --chown="$USER_UID":"$USER_GID" ./tools/geniass /tools/geniass
 RUN cd /tools/geniass && make
+
+COPY disease-network/delete-old-disease-graphs.cron /etc/cron.daily/delete-old-disease-graphs
 
 WORKDIR /app
 

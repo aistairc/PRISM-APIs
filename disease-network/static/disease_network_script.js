@@ -58,7 +58,7 @@ function nameComparator(a, b) {
   let aa = a.data('name')
   let bb = b.data('name')
   if (aa.charAt(0) == '"') aa = aa.substring(1, aa.length - 2)
-  if (bb.charAt(0) == '"') bb = bb.substring(1, aa.length - 2)
+  if (bb.charAt(0) == '"') bb = bb.substring(1, bb.length - 2)
   return aa.localeCompare(bb)
 }
 
@@ -150,20 +150,8 @@ function drawGraph(graph) {
     },
     responsive: true,
     elements: {
-      nodes: graph.nodes.map(data => ({
-        data: {
-          ...data,
-          id: `n${data.id}`,
-        }, 
-      })),
-      edges: graph.links.map(data => ({
-        data: {
-          ...data,
-          id: `e${data.id}`,
-          source: `n${data.source}`,
-          target: `n${data.target}`,
-        },
-      })),
+      nodes: graph.nodes,
+      edges: graph.edges,
     },
     style: [
       {
@@ -214,7 +202,7 @@ function drawGraph(graph) {
       {
         selector: '*:selected',
         style: {
-          'underlay-color': 'gold',
+          'underlay-color': 'orange',
           'underlay-padding': 5,
           'underlay-shape': 'ellipse',
           'underlay-opacity': 1,
@@ -224,7 +212,7 @@ function drawGraph(graph) {
       {
         selector: 'node:selected',
         style: {
-          'text-outline-color': 'gold',
+          'text-outline-color': 'orange',
           'text-outline-width': 2,
         },
       },
@@ -245,10 +233,17 @@ function drawGraph(graph) {
           'text-outline-width': 1,
         },
       },
+      {
+        selector: 'node.unselected',
+        style: {
+          'opacity': 0.2,
+        },
+      },
     ],
   })
   cy.remove(cy.nodes().filter('[[degree = 0]]'))
   const fullGraphJSON = cy.json()
+  fullGraphJSON.docs = graph.docs
 
   // TODO XXX not really working
   let zoomInMargin
@@ -271,6 +266,7 @@ function drawGraph(graph) {
 
   cy.on('select', 'node', function(evt) {
     cy.nodes(":selected").neighborhood().addClass('neighborhood')
+    cy.elements().not(':selected, .neighborhood').addClass('unselected')
     displayNodeInfo(this)
     canZoomIn = true
     adjustZoomButton()
@@ -278,12 +274,14 @@ function drawGraph(graph) {
   cy.on('select', 'edge', function(evt) {
     cy.edges(":selected").source().addClass('neighborhood')
     cy.edges(":selected").target().addClass('neighborhood')
+    cy.elements().not(':selected, .neighborhood').addClass('unselected')
     displayEdgeInfo(this)
     canZoomIn = true
     adjustZoomButton()
   })
   cy.on('unselect', '*', evt => {
     cy.elements("*.neighborhood").removeClass('neighborhood')
+    cy.elements("*.unselected").removeClass('unselected')
     displayNodeList()
     canZoomIn = false
     adjustZoomButton()
@@ -434,23 +432,23 @@ function drawGraph(graph) {
 
 
   function makeDocList() {
-    if (!graph["docs"]) {
+    if (!graph.docs) {
       $('#tab-docs-btn').hide()
       return
     }
     const docCounts = {}
-    for (const doc of Object.keys(graph["docs"])) {
+    for (const doc of Object.keys(graph.docs)) {
       docCounts[doc] = 0
     }
     cy.edges().each(edge => {
       for (const instance of edge.data("instances")) {
-        docCounts[instance["doc"]] += 1
+        docCounts[instance.doc] += 1
       }
     })
     const $list = $('#doc-list').empty()
-    const docs = Object.keys(graph["docs"]).sort()
+    const docs = Object.keys(graph.docs).sort()
     for (const doc of docs) {
-      const ok = graph["docs"][doc]
+      const ok = graph.docs[doc]
       const $docDiv = $('<div/>').appendTo($list)
       $('<span class="link-icon material-symbols-outlined">article</span>').appendTo($docDiv)
       const $doc = $('<span/>')

@@ -1,0 +1,9 @@
+#!/bin/bash
+# vim: ft=bash
+
+if [[ -z "$JOB_DIR" ]]
+then
+  JOB_DIR=./.cache/disease-network
+fi
+
+/usr/bin/find "$JOB_DIR" -maxdepth 1 -type d -mtime +7 -exec rm -r {} \;

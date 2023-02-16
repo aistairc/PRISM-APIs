@@ -148,6 +148,13 @@
         <h2>
           Export
         </h2>
+        {% if job_data %}
+        <div>
+          <a href="{{job_data}}" id="download-tgz-full" download="disease-graph-full.tgz">
+            TGZ (full)
+          </a>
+        </div>
+        {% endif %}
         <div>
           <a href="#" id="download-json-full" download="disease-graph-full.json">
             JSON (full)

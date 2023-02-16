@@ -2,10 +2,12 @@
 import tempfile
 from pathlib import Path
 from queue import Queue
-from tempfile import mkdtemp
+from tempfile import mkstemp
 from threading import Thread
 import os
 import json
+import uuid
+import tarfile
 
 from disease_network_generator import generate_graph_data, generate_status
 from disease_network_3d_plot import create_3d_plot_html
@@ -43,10 +45,9 @@ def index():
 
 @frontend.route("/submit", methods=["POST"])
 def submit():
-    file_utils.make_dirs(JOB_DIR)
-
-    job_dir = Path(mkdtemp(dir=JOB_DIR))
-    job_id = job_dir.name
+    job_id = str(uuid.uuid4())
+    job_dir = JOB_DIR / job_id
+    job_dir.mkdir(exist_ok=True, parents=True)
 
     num_files = 0
 
@@ -112,10 +113,24 @@ def fetch_graph_data(job_id):
     job_dir = JOB_DIR / job_id
     output_file_path_for_graph = job_dir / OUTPUT_FILE_FOR_GRAPH
 
-    if not output_file_path_for_graph.exists():
+    if not output_file_path_for_graph.is_file():
         return redirect(url_for(".index"))
 
     return send_file(output_file_path_for_graph, max_age=-1)
+
+
+@frontend.route("/job_data/<job_id>")
+def fetch_job_data(job_id):
+    job_dir = JOB_DIR / job_id
+
+    if not job_dir.is_dir():
+        return redirect(url_for(".index"))
+
+    tgz_file = job_dir / "disease-graph-full.tgz"
+    if not tgz_file.is_file():
+        with tarfile.open(tgz_file, mode="w:gz") as tgz:
+            tgz.add(job_dir, arcname=os.path.basename(job_dir))
+    return send_file(tgz_file, max_age=-1)
 
 
 @frontend.route("/graph/3d", methods=["POST"])
@@ -145,24 +160,46 @@ def view_disease_network(job_id):
 
     graph_data = json.loads(output_file_path_for_graph.read_text())
     doc_data_base = url_for(".fetch_doc_data", job_id=job_id, doc_id='')
-    return show_graph(graph_data, doc_data_base)
+    job_data = url_for(".fetch_job_data", job_id=job_id)
+    return show_graph(graph_data, doc_data_base, job_data)
 
 
 @frontend.route("/graph/show_json", methods=["POST"])
 def show_json():
     fn = request.files.get("json")
-    if not fn:
+    if not (fn and fn.filename):
         return redirect(url_for(".index"))
-    graph_data = json.load(fn)
-    return show_graph(graph_data)
+    if fn.filename.endswith('.json'):
+        graph_data = json.load(fn)
+        graph_data = graph_data["elements"]
+        return show_graph(graph_data)
+    elif fn.filename.endswith('.tgz'):
+        tfh, tfn = mkstemp(dir=JOB_DIR)
+        tmp_tgz_file = Path(tfn)
+        fn.save(tmp_tgz_file)
+        with tarfile.open(tmp_tgz_file) as tgz:
+            names = tgz.getnames()
+            try:
+                job_id = str(uuid.UUID(names[0]))
+            except:
+                return redirect(url_for(".index"))
+            prefix = job_id + "/"
+            job_dir = JOB_DIR / job_id
+            if not job_dir.is_dir():
+                if not all(name == job_id or name.startswith(prefix) for name in names):
+                    return redirect(url_for(".index"))
+                tgz.extractall(JOB_DIR)
+                tmp_tgz_file.rename(job_dir / "disease-graph-full.tgz")
+            return redirect(url_for(".view_disease_network", job_id=job_id))
 
 
-def show_graph(graph_data, doc_data_base=None):
+def show_graph(graph_data, doc_data_base=None, job_data=None):
     return render_template(
         "graph.html",
         app_name=frontend.name,
         graph_data=graph_data,
         doc_data_base=doc_data_base,
+        job_data=job_data,
     )
 
 
