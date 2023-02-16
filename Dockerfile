@@ -6,7 +6,7 @@ ARG USER_UID
 ARG USER_GID
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 USER_UID=$USER_UID USER_GID=$USER_GID
 
-COPY --chown="$USER_UIR":"$USER_GID" ./requirements.txt .
+COPY --chown="$USER_UID":"$USER_GID" ./requirements.txt .
 
 RUN apt-get update \
     && apt-get -y install build-essential perl ruby \
