@@ -238,6 +238,7 @@ def create_app():
 
     Bootstrap(app)
 
-    app.register_blueprint(frontend, url_prefix="/disease_network")
+    url_prefix = os.environ.get('DISEASE_NETWORK_URL_PREFIX', '/disease_network')
+    app.register_blueprint(frontend, url_prefix=url_prefix)
 
     return app
