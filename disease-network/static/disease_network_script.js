@@ -5,16 +5,16 @@
 
 
 const regNames = {
-  "-2": "Unspecified",
+  "-2": "Unregulated",
   "-1": "Negative",
-  0: "Unregulated",
+  0: "Unspecified",
   1: "Positive",
   2: "Mixed",
 }
 const regColors = {
-  "-2": "#aa6",
+  "-2": "#000",
   "-1": "#c66",
-  0: "#000",
+  0: "#aa6",
   1: "#6c6",
   2: "#660",
 }
