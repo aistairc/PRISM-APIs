@@ -310,6 +310,25 @@ function drawGraph(graph) {
     }
   })
 
+  let selectedBratId = null
+  $('#brat')
+  .on('click', '[data-span-id]', evt => {
+    const elId = $(evt.target).attr('data-span-id')
+    displayBratRelevant(elId)
+  })
+  .on('click', '[data-arc-role]', evt => {
+    const arcRole = $(evt.target).attr('data-arc-role')
+    const arcOrigin = $(evt.target).attr('data-arc-origin')
+    const arcTarget = $(evt.target).attr('data-arc-target')
+    const elId = [arcOrigin, arcRole, arcTarget].join('-')
+    displayBratRelevant(elId)
+  })
+  $('#brat').on('click', '.background', evt => {
+    selectedBratId = null
+    select()
+  })
+
+
   // window.cy = cy // DEBUG
 
 
@@ -678,9 +697,11 @@ function drawGraph(graph) {
     const $instances = $('<div/>')
       .appendTo($docFS)
     nodeData.filteredInstances.forEach(instance => {
+      const bratIds = instance.brat_ids.map(bratId => bratId.join('-'))
       const $instance = $('<div/>')
         .appendTo($instances)
       $('<span class="link-icon valign-mid material-symbols-outlined">article</span>')
+        .toggleClass('brat-selected', bratIds.includes(selectedBratId))
         .appendTo($instance)
       $('<span/>')
         .toggleClass('link doclink', !!docDataBase)
@@ -755,9 +776,11 @@ function drawGraph(graph) {
           .text(regNames[reg])
           .appendTo($fs)
         instances.forEach(instance => {
+          const bratIds = instance.brat_ids.map(bratId => bratId.join('-'))
           const $instance = $('<div/>')
             .appendTo($fs)
           $('<span class="link-icon material-symbols-outlined">article</span>')
+            .toggleClass('brat-selected', bratIds.includes(selectedBratId))
             .appendTo($instance)
           $('<span/>')
             .toggleClass('link doclink', !!docDataBase)
@@ -769,6 +792,59 @@ function drawGraph(graph) {
             .appendTo($instance)
         })
       })
+  }
+
+  function displayBratRelevant(elId, type) {
+    selectedBratId = elId
+    const els = cy.elements().filter(el =>
+      el.data('instances').some(instance =>
+        instance.brat_ids.some(bratId =>
+          bratId.join('-') == elId
+        )
+      )
+    )
+    $('#node-list').hide()
+    $('#tab-info-cb').prop('checked', true)
+    const $info = $('#info').empty()
+
+    $('<h2/>')
+      .text(`Relevant elements`)
+      .appendTo($info)
+
+    if (!els.length) {
+      $info.append('None')
+    }
+
+    for (const el of els) {
+      if (el.isNode()) {
+        const $nodeLink = $('<div/>')
+          .appendTo($info)
+        $('<span class="link-icon material-symbols-outlined">circle</span>')
+          .appendTo($nodeLink)
+        $('<span class="link nodelink"/>')
+          .text(el.data('name'))
+          .on('click', evt => select(el))
+          .appendTo($nodeLink)
+      } else {
+        const $edgeLink = $('<div/>')
+          .appendTo($info)
+        $('<span class="link-icon material-symbols-outlined">link</span>')
+          .appendTo($edgeLink)
+        const source = el.source()
+        const target = el.target()
+        const $link = $('<span class="link edgelink"/>')
+          .on('click', evt => select(el))
+          .appendTo($edgeLink)
+        $('<span/>')
+          .text(source.data('name'))
+          .appendTo($link)
+        $('<span class="link-icon material-symbols-outlined">line_end_arrow</span>')
+          .appendTo($link)
+        $('<span class="link nodelink"/>')
+          .text(target.data('name'))
+          .appendTo($link)
+      }
+    }
   }
 
   function displayDoc(doc, newFocus) {

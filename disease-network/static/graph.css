@@ -164,3 +164,7 @@ html h2 {
 #subgraph-filter input {
   width: 50px;
 }
+
+.brat-selected {
+  background-color: orange;
+}
