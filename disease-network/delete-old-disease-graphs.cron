@@ -6,4 +6,8 @@ then
   JOB_DIR=./.cache/disease-network
 fi
 
-/usr/bin/find "$JOB_DIR" -maxdepth 1 -type d -mtime +7 -exec rm -r {} \;
+/usr/bin/find "$JOB_DIR" -name graph.json -type f -mtime +7 -print0 | while IFS= read -r -d '' file
+do
+  dir="$(dirname "$file")"
+  rm -r "$dir"
+done
