@@ -333,13 +333,13 @@ function drawGraph(graph) {
 
 
   class Filter {
-    constructor(items, prop, $element, callback) {
+    constructor(items, prop, $element, callback, textTransform) {
       this.prop = prop
       items = items.map(item => Array.isArray(item) ? item : [item, item])
       this.filter = Object.fromEntries(items.map(([value, name]) => [value, true]))
       this.$counters = []
       for (const [value, name] of items) {
-        const $label = $('<label/>')
+        const $label = $('<label class="iconed"/>')
           .appendTo($element)
         const $cb = $('<input type="checkbox" checked/>')
           .val(value)
@@ -348,13 +348,16 @@ function drawGraph(graph) {
             callback()
           })
           .appendTo($label)
+        const transformedName = textTransform ? textTransform(name) : name
+        const $content = $('<div/>')
+          .appendTo($label)
         $('<span/>')
-          .text(name + " (")
-          .appendTo($label)
+          .text(transformedName + " (")
+          .appendTo($content)
         this.$counters[value] = $('<span class="count"/>')
-          .appendTo($label)
+          .appendTo($content)
         $('<span>)</span>')
-          .appendTo($label)
+          .appendTo($content)
       }
     }
 
@@ -417,7 +420,8 @@ function drawGraph(graph) {
   )
   const docFilter = new Filter(
     uniquePropValues(allEdgeInstances, 'doc'),
-    'doc', $('#document-filters'), debouncedFiltersChangedHandler
+    'doc', $('#document-filters'), debouncedFiltersChangedHandler,
+    name => name.replace(/\.txt$/, '')
   )
   const edgeFilters = [regFilter, eventFilter, docFilter]
   const nodeFilters = [entityFilter, docFilter]
@@ -468,7 +472,7 @@ function drawGraph(graph) {
     const docs = Object.keys(graph.docs).sort()
     for (const doc of docs) {
       const ok = graph.docs[doc]
-      const $docDiv = $('<div/>').appendTo($list)
+      const $docDiv = $('<div class="iconed"/>').appendTo($list)
       $('<span class="link-icon material-symbols-outlined">article</span>').appendTo($docDiv)
       const $doc = $('<span/>')
         .text(doc.replace(/\.txt$/, ''))
@@ -586,7 +590,7 @@ function drawGraph(graph) {
       .text('Node List')
       .appendTo($nodeList)
     for (const node of nodeList) {
-      const $nodeLink = $('<div/>')
+      const $nodeLink = $('<div class="iconed"/>')
         .appendTo($nodeList)
       $('<span class="link-icon material-symbols-outlined">circle</span>')
         .appendTo($nodeLink)
@@ -642,7 +646,7 @@ function drawGraph(graph) {
       .appendTo($info)
 
     if (nodeData.cui) {
-      const $dbLink = $('<div/>')
+      const $dbLink = $('<div class="iconed"/>')
         .appendTo($info)
       $('<span class="link-icon material-symbols-outlined">database</span>')
         .appendTo($dbLink)
@@ -677,7 +681,7 @@ function drawGraph(graph) {
           .appendTo($fs)
         edges.forEach(edge => {
           const otherNode = edge[otherEnd].bind(edge)()
-          const $docLink = $('<div>')
+          const $docLink = $('<div class="iconed">')
             .appendTo($fs)
           $('<span class="link-icon material-symbols-outlined"/>')
             .text(icon)
@@ -698,19 +702,21 @@ function drawGraph(graph) {
       .appendTo($docFS)
     nodeData.filteredInstances.forEach(instance => {
       const bratIds = instance.brat_ids.map(bratId => bratId.join('-'))
-      const $instance = $('<div/>')
+      const $instance = $('<div class="iconed"/>')
         .appendTo($instances)
       $('<span class="link-icon valign-mid material-symbols-outlined">article</span>')
         .toggleClass('brat-selected', bratIds.includes(selectedBratId))
+        .appendTo($instance)
+      const $content = $('<span/>')
         .appendTo($instance)
       $('<span/>')
         .toggleClass('link doclink', !!docDataBase)
         .text(instance.doc.replace(/\.txt$/, ''))
         .on('click', evt => displayDoc(instance.doc, instance.brat_ids))
-        .appendTo($instance)
+        .appendTo($content)
       $('<span/>')
         .text(" " + instance.type)
-        .appendTo($instance)
+        .appendTo($content)
     })
   }
 
@@ -730,7 +736,7 @@ function drawGraph(graph) {
       .text(edgeData.name)
       .appendTo($info)
 
-    const $sourceLink = $('<div/>')
+    const $sourceLink = $('<div class="iconed"/>')
       .appendTo($info)
     $('<span class="link-icon material-symbols-outlined">circle</span>')
       .appendTo($sourceLink)
@@ -741,7 +747,7 @@ function drawGraph(graph) {
     $('<div>')
       .text('influences')
       .appendTo($info)
-    const $targetLink = $('<div/>')
+    const $targetLink = $('<div class="iconed"/>')
       .appendTo($info)
     $('<span class="link-icon material-symbols-outlined">circle</span>')
       .appendTo($targetLink)
@@ -777,19 +783,21 @@ function drawGraph(graph) {
           .appendTo($fs)
         instances.forEach(instance => {
           const bratIds = instance.brat_ids.map(bratId => bratId.join('-'))
-          const $instance = $('<div/>')
+          const $instance = $('<div class="iconed"/>')
             .appendTo($fs)
           $('<span class="link-icon material-symbols-outlined">article</span>')
             .toggleClass('brat-selected', bratIds.includes(selectedBratId))
+            .appendTo($instance)
+          const $content = $('<span/>')
             .appendTo($instance)
           $('<span/>')
             .toggleClass('link doclink', !!docDataBase)
             .text(instance.doc.replace(/\.txt$/, ''))
             .on('click', evt => displayDoc(instance.doc, instance.brat_ids))
-            .appendTo($instance)
+            .appendTo($content)
           $('<span/>')
             .text(' ' + instance.type)
-            .appendTo($instance)
+            .appendTo($content)
         })
       })
   }
@@ -817,7 +825,7 @@ function drawGraph(graph) {
 
     for (const el of els) {
       if (el.isNode()) {
-        const $nodeLink = $('<div/>')
+        const $nodeLink = $('<div class="iconed"/>')
           .appendTo($info)
         $('<span class="link-icon material-symbols-outlined">circle</span>')
           .appendTo($nodeLink)
@@ -826,7 +834,7 @@ function drawGraph(graph) {
           .on('click', evt => select(el))
           .appendTo($nodeLink)
       } else {
-        const $edgeLink = $('<div/>')
+        const $edgeLink = $('<div class="iconed"/>')
           .appendTo($info)
         $('<span class="link-icon material-symbols-outlined">link</span>')
           .appendTo($edgeLink)
@@ -835,7 +843,7 @@ function drawGraph(graph) {
         const $link = $('<span class="link edgelink"/>')
           .on('click', evt => select(el))
           .appendTo($edgeLink)
-        $('<span/>')
+        $('<span class="iconed"/>')
           .text(source.data('name'))
           .appendTo($link)
         $('<span class="link-icon material-symbols-outlined">line_end_arrow</span>')
