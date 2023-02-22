@@ -471,7 +471,7 @@ function drawGraph(graph) {
       const $docDiv = $('<div/>').appendTo($list)
       $('<span class="link-icon material-symbols-outlined">article</span>').appendTo($docDiv)
       const $doc = $('<span/>')
-        .text(doc)
+        .text(doc.replace(/\.txt$/, ''))
         .appendTo($docDiv)
       if (ok) {
         $doc
@@ -705,7 +705,7 @@ function drawGraph(graph) {
         .appendTo($instance)
       $('<span/>')
         .toggleClass('link doclink', !!docDataBase)
-        .text(instance.doc)
+        .text(instance.doc.replace(/\.txt$/, ''))
         .on('click', evt => displayDoc(instance.doc, instance.brat_ids))
         .appendTo($instance)
       $('<span/>')
@@ -784,7 +784,7 @@ function drawGraph(graph) {
             .appendTo($instance)
           $('<span/>')
             .toggleClass('link doclink', !!docDataBase)
-            .text(instance.doc)
+            .text(instance.doc.replace(/\.txt$/, ''))
             .on('click', evt => displayDoc(instance.doc, instance.brat_ids))
             .appendTo($instance)
           $('<span/>')
