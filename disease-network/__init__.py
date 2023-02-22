@@ -52,20 +52,18 @@ def submit():
     num_files = 0
 
     if "text" in request.form:
-        with tempfile.NamedTemporaryFile(
-            suffix=".txt", mode="w+", encoding="UTF-8", dir=job_dir, delete=False
-        ) as temp_file:
-            temp_file.write(request.form["text"])
-            temp_file.flush()
-
+        file = job_dir / "input.txt"
+        file.write_text(request.form["text"])
         num_files += 1
     else:
         for fn in request.files.getlist("file"):
             filename = secure_filename(fn.filename)
+            if filename.endswith(".txt"):
+                fn.save(job_dir / filename)
+                num_files += 1
 
-            fn.save(job_dir / filename)
-
-            num_files += 1
+    if not num_files:
+        return redirect(url_for(".index"))
 
     queue.put(job_id)
 
