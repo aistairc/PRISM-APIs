@@ -113,11 +113,16 @@ main {
 
 html h1 {
   font-size: 24px;
-  line-height: calc(var(--button-h) - 5px);
+  margin-top: 0;
 }
 
 html h2 {
   font-size: 20px;
+  margin-top: 0;
+}
+
+html h3 {
+  font-size: 16px;
 }
 
 .sidebar-fieldset {

@@ -35,7 +35,7 @@ MB = 1024 * 1024
 MAX_CONTENT_LENGTH = 1024 * MB
 
 queue = Queue()
-frontend = Blueprint("Disease Network Visualization", __name__, static_folder="static")
+frontend = Blueprint("Disease Network Constructor", __name__, static_folder="static")
 
 
 @frontend.route("/")
