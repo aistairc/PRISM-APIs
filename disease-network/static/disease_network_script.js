@@ -234,7 +234,7 @@ function drawGraph(graph) {
         },
       },
       {
-        selector: 'node.unselected',
+        selector: '.unselected',
         style: {
           'opacity': 0.2,
         },
@@ -311,6 +311,7 @@ function drawGraph(graph) {
   })
 
   let selectedBratId = null
+  let displayedBratDoc = null
   $('#brat')
   .on('click', '[data-span-id]', evt => {
     const elId = $(evt.target).attr('data-span-id')
@@ -705,7 +706,7 @@ function drawGraph(graph) {
       const $instance = $('<div class="iconed"/>')
         .appendTo($instances)
       $('<span class="link-icon valign-mid material-symbols-outlined">article</span>')
-        .toggleClass('brat-selected', bratIds.includes(selectedBratId))
+        .toggleClass('brat-selected', displayedBratDoc == instance.doc && bratIds.includes(selectedBratId))
         .appendTo($instance)
       const $content = $('<span/>')
         .appendTo($instance)
@@ -786,7 +787,7 @@ function drawGraph(graph) {
           const $instance = $('<div class="iconed"/>')
             .appendTo($fs)
           $('<span class="link-icon material-symbols-outlined">article</span>')
-            .toggleClass('brat-selected', bratIds.includes(selectedBratId))
+            .toggleClass('brat-selected', displayedBratDoc == instance.doc && bratIds.includes(selectedBratId))
             .appendTo($instance)
           const $content = $('<span/>')
             .appendTo($instance)
@@ -806,7 +807,8 @@ function drawGraph(graph) {
     selectedBratId = elId
     const els = cy.elements().filter(el =>
       el.data('instances').some(instance =>
-        instance.brat_ids.some(bratId =>
+        instance.doc == displayedBratDoc
+        && instance.brat_ids.some(bratId =>
           bratId.join('-') == elId
         )
       )
@@ -864,6 +866,7 @@ function drawGraph(graph) {
     fetch(docDataBase + '/' + doc)
     .then(res => res.json())
     .then(currentDocData => {
+      displayedBratDoc = doc
       if (dispatcher) {
         dispatcher.post('current', [
           null,
