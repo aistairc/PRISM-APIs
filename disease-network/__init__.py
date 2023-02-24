@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 import tempfile
 from pathlib import Path
+import shutil
 from queue import Queue
 from tempfile import mkstemp
 from threading import Thread
+from multiprocessing import Manager
 import os
 import json
 import uuid
@@ -14,17 +16,24 @@ from disease_network_3d_plot import create_3d_plot_html
 from flask import (
     Blueprint,
     Flask,
+    abort,
     redirect,
     render_template,
     request,
     send_file,
     url_for,
 )
+from flask.json import jsonify
 from flask_bootstrap import Bootstrap
 from utils import file_utils
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import NotFound
 
 from .config import samples
+
+
+VERSION="0.4"
+
 
 JOB_DIR = Path(os.environ.get('JOB_DIR', './.cache/disease-network')).resolve()
 
@@ -38,9 +47,44 @@ queue = Queue()
 frontend = Blueprint("Disease Network Constructor", __name__, static_folder="static")
 
 
+old_job_list = [
+    path.name
+    for path in sorted(JOB_DIR.glob("*"), key=os.path.getmtime)
+    if not (path / OUTPUT_FILE_FOR_GRAPH).is_file()
+]
+
+manager = Manager()
+job_lock = manager.Lock()
+current_job_processed_files = manager.Value('i', 0)
+current_job_total_files = manager.Value('i', 0)
+jobs = manager.list(old_job_list)
+job_files = manager.dict({
+    job_id: sum(1 for _ in (JOB_DIR / job_id).glob("*.txt"))
+    for job_id in old_job_list
+})
+for job_id in old_job_list:
+    status_file_path = JOB_DIR / job_id / STATUS_FILE_NAME
+    if status_file_path.is_file():
+        status_file_path.unlink()
+    queue.put(job_id)
+old_job_list = None
+
+
+
+def ensure_uuid(job_id):
+    try:
+        return str(uuid.UUID(job_id))
+    except:
+        raise NotFound()
+
+
 @frontend.route("/")
 def index():
-    return render_template("index.html", samples=samples, app_name=frontend.name)
+    return render_template("index.html",
+        samples=samples,
+        app_name=frontend.name,
+        version=VERSION,
+    )
 
 
 @frontend.route("/submit", methods=["POST"])
@@ -49,65 +93,103 @@ def submit():
     job_dir = JOB_DIR / job_id
     job_dir.mkdir(exist_ok=True, parents=True)
 
-    num_files = 0
-
+    num_docs = 0
     if "text" in request.form:
         file = job_dir / "input.txt"
         file.write_text(request.form["text"])
-        num_files += 1
+        num_docs = 1
     else:
         for fn in request.files.getlist("file"):
             filename = secure_filename(fn.filename)
             if filename.endswith(".txt"):
                 fn.save(job_dir / filename)
-                num_files += 1
+                num_docs += 1
 
-    if not num_files:
+    if not num_docs:
         return redirect(url_for(".index"))
+
+    with job_lock:
+        jobs.append(job_id)
+        job_files[job_id] = num_docs
 
     queue.put(job_id)
 
-    # Hack
-    status_file_path = job_dir / STATUS_FILE_NAME
-
-    generate_status(0, num_files, False, status_file_path)
-
     url = url_for(".view", job_id=job_id)
-
     return redirect(url)
 
 
 @frontend.route("/<job_id>")
 def view(job_id):
+    job_id = ensure_uuid(job_id)
     job_dir = JOB_DIR / job_id
     status_file_path = job_dir / STATUS_FILE_NAME
 
-    if not status_file_path.exists():
-        return redirect(url_for(".index"))
+    if not job_dir.is_dir():
+        return abort(404)
 
     return render_template(
         "view.html",
         page_data={
             "statusURL": url_for(".status", job_id=job_id),
             "graphURL": url_for(".view_disease_network", job_id=job_id),
+            "abortURL": url_for(".abort", job_id=job_id),
+            "indexURL": url_for(".index"),
         },
         app_name=frontend.name,
+        version=VERSION,
     )
+
+
+@frontend.route("/abort/<job_id>", methods=["POST"])
+def abort(job_id):
+    job_id = ensure_uuid(job_id)
+    job_dir = JOB_DIR / job_id
+    if not job_dir.is_dir():
+        return abort(404)
+
+
+    with job_lock:
+        if job_id in job_files:
+            job_files.pop(job_id)
+            jobs.remove(job_id)
+
+    abort_dir = JOB_DIR / (job_id + ".aborted")
+    # since rmtree is not atomic, first move atomically out of the way
+    job_dir.rename(abort_dir)
+    shutil.rmtree(abort_dir)
+    return ('', 204)
+
 
 
 @frontend.route("/status/<job_id>")
 def status(job_id):
+    job_id = ensure_uuid(job_id)
     job_dir = JOB_DIR / job_id
-    status_file_path = job_dir / STATUS_FILE_NAME
+    if not job_dir.is_dir():
+        return jsonify({ "aborted": True })
 
+    status_file_path = job_dir / STATUS_FILE_NAME
     if not status_file_path.exists():
-        return redirect(url_for(".index"))
+        with job_lock:
+            try:
+                job_ix = jobs.index(job_id)
+            except KeyError:
+                # XXX TODO
+                return abort(404)
+            remaining_docs = sum(
+                [job_files[jobs[ix]] for ix in range(job_ix)],
+                current_job_total_files.value - current_job_processed_files.value,
+            )
+        return jsonify({
+            "queue": remaining_docs,
+        })
 
     return send_file(status_file_path, max_age=-1)
 
 
 @frontend.route("/graph_data/<job_id>")
 def fetch_graph_data(job_id):
+    job_id = ensure_uuid(job_id)
     job_dir = JOB_DIR / job_id
     output_file_path_for_graph = job_dir / OUTPUT_FILE_FOR_GRAPH
 
@@ -119,6 +201,7 @@ def fetch_graph_data(job_id):
 
 @frontend.route("/job_data/<job_id>")
 def fetch_job_data(job_id):
+    job_id = ensure_uuid(job_id)
     job_dir = JOB_DIR / job_id
 
     if not job_dir.is_dir():
@@ -139,6 +222,7 @@ def show_3d_graph():
 
 @frontend.route("/doc_data/<job_id>/<doc_id>")
 def fetch_doc_data(job_id, doc_id):
+    job_id = ensure_uuid(job_id)
     job_dir = JOB_DIR / job_id
     output_file_path_for_doc = job_dir / f"{doc_id}.json"
 
@@ -150,6 +234,7 @@ def fetch_doc_data(job_id, doc_id):
 
 @frontend.route("/graph/<job_id>")
 def view_disease_network(job_id):
+    job_id = ensure_uuid(job_id)
     job_dir = JOB_DIR / job_id
     output_file_path_for_graph = job_dir / OUTPUT_FILE_FOR_GRAPH
 
@@ -177,10 +262,7 @@ def show_json():
         fn.save(tmp_tgz_file)
         with tarfile.open(tmp_tgz_file) as tgz:
             names = tgz.getnames()
-            try:
-                job_id = str(uuid.UUID(names[0]))
-            except:
-                return redirect(url_for(".index"))
+            job_id = ensure_uuid(names[0])
             prefix = job_id + "/"
             job_dir = JOB_DIR / job_id
             if not job_dir.is_dir():
@@ -194,23 +276,36 @@ def show_json():
 def show_graph(graph_data, doc_data_base=None, job_data=None):
     return render_template(
         "graph.html",
-        app_name=frontend.name,
         graph_data=graph_data,
         doc_data_base=doc_data_base,
         job_data=job_data,
+        app_name=frontend.name,
+        version=VERSION,
     )
 
 
 def process_job(job_dir):
     output_file_path_for_graph = job_dir / OUTPUT_FILE_FOR_GRAPH
     status_file_path = job_dir / STATUS_FILE_NAME
+    job_id = job_dir.name
+
+    if not job_dir.is_dir():
+        return
 
     docs = [(fn.name, file_utils.read_text(fn)) for fn in job_dir.glob("*.txt")]
 
+    with job_lock:
+        jobs.remove(job_id)
+        current_job_total_files.value = job_files.pop(job_id)
+        current_job_processed_files.value = 0
+
+    generate_status(0, len(docs), False, status_file_path)
     generate_graph_data(
         docs,
         str(output_file_path_for_graph),
         status_file_path,
+        current_job_processed_files,
+        job_lock,
     )
 
 

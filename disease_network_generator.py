@@ -323,93 +323,112 @@ class RegulationSquasher:
 
 
 def generate_status(doc_idx, num_docs, status, status_file):
-    file_utils.write_json(
-        {"current": doc_idx, "total": num_docs, "status": status}, status_file
-    )
+    try:
+        file_utils.write_json(
+            {"current": doc_idx, "total": num_docs, "status": status}, status_file
+        )
+    except FileNotFoundError:
+        logger.warning(f"Could not write to {status_file}")
 
 
 def generate_graph_data(
     docs,
     output_file_for_graph,
     status_file,
+    current_job_processed_files=None,
+    job_lock=None,
 ):
     max_args = 0
     all_events = []
     doc_anns = {}
     doc_ok = {}
     regulation_squasher = RegulationSquasher()
+    ann_dir = os.path.dirname(output_file_for_graph)
 
     for doc_idx, (doc_name, doc) in enumerate(docs, start=1):
-        # el_entities, el_norms, el_cuis, _ = annotate("entity_linking", doc)
-        # ev_entities, _, _, ev_events = annotate("event_extraction", doc)
-        if isinstance(doc_name, tuple): # GTDEBUG
-            el_entities, el_norms, el_cuis, ev_entities, ev_events = doc_name
-            doc_name = "DEBUG"
+        try:
+            # el_entities, el_norms, el_cuis, _ = annotate("entity_linking", doc)
+            # ev_entities, _, _, ev_events = annotate("event_extraction", doc)
+            if isinstance(doc_name, tuple): # GTDEBUG
+                el_entities, el_norms, el_cuis, ev_entities, ev_events = doc_name
+                doc_name = "DEBUG"
 
-            el_entities = [ENTITY(*e) for e in el_entities]
-            el_norms = [NORMALIZATION(*n) for n in el_norms]
-            ev_entities = [ENTITY(*e) for e in ev_entities]
-            ev_entity_map = {e.id: e for e in ev_entities}
-            ev_events = [EVENT(*e, Regulation.for_type(ev_entity_map[e[1]])) for e in ev_events]
-            # TODO make sure `annotate` detects regulation
+                el_entities = [ENTITY(*e) for e in el_entities]
+                el_norms = [NORMALIZATION(*n) for n in el_norms]
+                ev_entities = [ENTITY(*e) for e in ev_entities]
+                ev_entity_map = {e.id: e for e in ev_entities}
+                ev_events = [EVENT(*e, Regulation.for_type(ev_entity_map[e[1]])) for e in ev_events]
+                # TODO make sure `annotate` detects regulation
 
-        else:
-            try:
-                el_entities, el_norms, el_cuis, _, _ = annotate("entity_linking", doc)
-                ev_entities, _, _, ev_events, anns = annotate("event_extraction", doc)
-            except:
-                logger.debug(f"There was an error annotating {doc_name}")
-                doc_ok[doc_name] = False
-                continue
+            else:
+                try:
+                    el_entities, el_norms, el_cuis, _, _ = annotate("entity_linking", doc)
+                    if not status_file.is_file():
+                        # aborted
+                        return
+                    ev_entities, _, _, ev_events, anns = annotate("event_extraction", doc)
+                    if not status_file.is_file():
+                        # aborted
+                        return
+                except:
+                    logger.debug(f"There was an error annotating {doc_name}")
+                    doc_ok[doc_name] = False
+                    anns = {}
+                    continue
+                finally:
+                    if status_file.is_file():
+                        file_utils.write_json(anns, os.path.join(ann_dir, doc_name + ".json"))
 
-            doc_anns[doc_name] = anns
 
-        logger.debug(f"Successfully annotated {doc_name}")
-        norm_map = {}
+            logger.debug(f"Successfully annotated {doc_name}")
+            norm_map = {}
 
-        entities = {e.id: e for e in el_entities}
+            entities = {e.id: e for e in el_entities}
 
-        for norm in el_norms:
-            e = entities[norm.target]
-            span_starts, span_ends = zip(*e.spans)
-            span_start, span_end = min(span_starts), max(span_ends)
+            for norm in el_norms:
+                e = entities[norm.target]
+                span_starts, span_ends = zip(*e.spans)
+                span_start, span_end = min(span_starts), max(span_ends)
 
-            norm_map[span_start, span_end] = {
-                "id": norm.refid,
-                "name": el_cuis[norm.refid],
-            }
+                norm_map[span_start, span_end] = {
+                    "id": norm.refid,
+                    "name": el_cuis[norm.refid],
+                }
 
-        entities = {e.id: e for e in ev_entities}
-        events = {ev.id: ev for ev in ev_events}
+            entities = {e.id: e for e in ev_entities}
+            events = {ev.id: ev for ev in ev_events}
 
-        for e_id, e in entities.items():
-            span_starts, span_ends = zip(*e.spans)
-            span_start, span_end = min(span_starts), max(span_ends)
+            for e_id, e in entities.items():
+                span_starts, span_ends = zip(*e.spans)
+                span_start, span_end = min(span_starts), max(span_ends)
 
-            norm = norm_map.get(
-                (span_start, span_end),
-                {
-                    "id": None,
-                    "name": None,
-                },
-            )
+                norm = norm_map.get(
+                    (span_start, span_end),
+                    {
+                        "id": None,
+                        "name": None,
+                    },
+                )
 
-            entities[e_id] = entities[e_id]._replace(umls_id=norm["id"])
-            entities[e_id] = entities[e_id]._replace(canonical_name=norm["name"])
-            entities[e_id] = entities[e_id]._replace(text=doc[span_start:span_end])
+                entities[e_id] = entities[e_id]._replace(umls_id=norm["id"])
+                entities[e_id] = entities[e_id]._replace(canonical_name=norm["name"])
+                entities[e_id] = entities[e_id]._replace(text=doc[span_start:span_end])
 
-        regulation_squasher.add(doc_name, entities, events)
-        doc_ok[doc_name] = True
-        generate_status(doc_idx, len(docs), False, status_file)
+            regulation_squasher.add(doc_name, entities, events)
+            doc_ok[doc_name] = True
+        finally:
+            if current_job_processed_files:
+                with job_lock:
+                    current_job_processed_files.value += 1
+            if not status_file.is_file():
+                # aborted
+                return
+            generate_status(doc_idx, len(docs), False, status_file)
 
     graph = regulation_squasher.graph_data()
     graph["docs"] = doc_ok
 
     file_utils.write_json(graph, output_file_for_graph)
-
-    ann_dir = os.path.dirname(output_file_for_graph)
-    for doc_name, anns in doc_anns.items():
-        file_utils.write_json(anns, os.path.join(ann_dir, doc_name + ".json"))
 
     generate_status(len(docs), len(docs), True, status_file)
 
