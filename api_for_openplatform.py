@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # import itertools
 # import json
-# import os
+import os
 import socket
 
 # import tempfile
@@ -23,8 +23,7 @@ from pydantic.dataclasses import dataclass
 # import disease_network_generator_for_3d
 # from utils import file_utils
 
-# EXTERNAL_API_BASE_URL = os.environ["EXTERNAL_API_BASE_URL"]
-EXTERNAL_API_BASE_URL = "http://127.0.0.1:9091"
+EXTERNAL_API_BASE_URL = os.environ.get('EXTERNAL_API_BASE_URL', 'http://127.0.0.1:9091')
 
 # LOG_FILE = "logs/api_for_openplatform.log"
 

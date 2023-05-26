@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }}{% endblock %}
+
+{% block styles %}
+  <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css" integrity="sha512-NmLkDIU1C/C88wi324HBc+S2kLhi08PN5GDeUVVVC/BVt/9Izdsc9SVeVfA1UZbY3sHUlDSyRXhCzHfr6hmPPw==" crossorigin="anonymous" referrerpolicy="no-referrer" /> -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" />
+  <link rel="stylesheet" href="{{ url_for(app_name + ".static", filename="graph.css") }}"/>
+
+  <link href="{{ url_for(app_name + ".static", filename="brat/jquery-ui.css") }}" rel="stylesheet" type="text/css"/>
+  <link href="{{ url_for(app_name + ".static", filename="brat/jquery-ui-redmond.css") }}" rel="stylesheet" type="text/css"/>
+  <link href="{{ url_for(app_name + ".static", filename="brat/style-vis.css") }}" rel="stylesheet" type="text/css"/>
+{% endblock %}
+
+{% block scripts %}
+  <script type="text/javascript" src="{{ url_for(app_name + ".static", filename="brat/head.load.min.js") }}"></script>
+  <script type="text/javascript">
+    const urls = {
+      jquery: {{ url_for(app_name + ".static", filename="brat/jquery.min.js") | tojson | safe }},
+      libraries: [
+        {{ url_for(app_name + ".static", filename="brat/jquery-ui.min.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/jquery-ui.combobox.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/jquery.svg.min.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/jquery.svgdom.min.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/jquery.ba-bbq.min.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/jquery.json.min.js") | tojson | safe }},
+        // brat helpers
+        {{ url_for(app_name + ".static", filename="brat/util.js") | tojson | safe }},
+        // brat modules
+        {{ url_for(app_name + ".static", filename="brat/dispatcher.js") | tojson | safe }},
+        {{ url_for(app_name + ".static", filename="brat/visualizer.js") | tojson | safe }},
+      ],
+    }
+
+    const graphData = `{{ graph_data }}`;
+    const docDataBase = `{{ doc_data }}`;
+
+    const collData = {"entity_attribute_types": [], "entity_types": [{"arcs": [], "attributes": [], "bgColor": "lightgray", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Dummy", "normalizations": [], "type": "Dummy", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#c2a47c", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Disorder", "normalizations": [], "type": "Disorder", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#f2d4ac", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Measurement ", "normalizations": [], "type": "Measurement ", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#9fdeee", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Anatomical_entity", "normalizations": [], "type": "Anatomical_entity", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#9fffff", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Cell", "normalizations": [], "type": "Cell", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#afffee", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Cell_component", "normalizations": [], "type": "Cell_component", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#7fff00", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Inorganic_compound", "normalizations": [], "type": "Inorganic_compound", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#00ff7f", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Organic_compound_other", "normalizations": [], "type": "Organic_compound_other", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#00ff9f", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Pharmacological_substance", "normalizations": [], "type": "Pharmacological_substance", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#7fa2ee", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Protein_family_or_group", "normalizations": [], "type": "Protein_family_or_group", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "cyan", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Entity_Property", "normalizations": [], "type": "Entity_Property", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "#bb2222", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Genetic_info", "normalizations": [], "type": "Genetic_info", "unused": false}, {"arcs": [], "attributes": [], "bgColor": "white", "borderColor": "darken", "children": [], "fgColor": "black", "labels": [], "name": "Negated", "normalizations": [], "type": "Negated", "unused": false}], "event_attribute_types": [], "event_types": [], "relation_attribute_types": [], "relation_types": [], "ui_names": {"attributes": "attributes", "entities": "entities", "events": "events", "relations": "relations"}, "unconfigured_types": [], "visual_options": {"arc_bundle": "all", "text_direction": "ltr"}};
+  </script>
+  </script><!-- <script type="text/javascript" src="http://d3js.org/d3.v3.min.js"></script> -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script type="text/javascript" src="{{ url_for(app_name + ".static", filename="disease_network_script.js") }}"></script>
+{%- endblock %}
+
+{% block content %}
+  {{ super() }}
+  <div class="sidebar-wrapper">
+    <div class="sidebar-buttons">
+      <label>
+        <input type="radio" name="tab-selector" class="tab-selector" checked>
+        <nav class="material-symbols-outlined">
+          coronavirus
+        </nav>
+        <section class="sidebar-tab">
+          <h1>
+            Disease Network
+          </h1>
+          <p>
+            &copy; AIST 2022
+          </p>
+        </section>
+      </label>
+      
+      <label>
+        <input id="tab-info" type="radio" name="tab-selector" class="tab-selector">
+        <nav class="material-symbols-outlined">
+          info
+        </nav>
+        <section class="sidebar-tab">
+          <h2 id="info-header">
+          </h2>
+          <div id="info">
+          </div>
+        </section>
+      </label><!-- tab-info -->
+      
+      <label>
+        <input id="tab-filters" type="radio" name="tab-selector" class="tab-selector">
+        <nav class="material-symbols-outlined">
+          tune
+        </nav>
+        <section class="sidebar-tab">
+          <h2>
+            Filters
+          </h2>
+
+          <fieldset id="relation-filters">
+            <legend>Relation types</legend>
+            <!--
+            <label>
+              <input type="checkbox" checked> Gene expression
+            </label>
+            -->
+          </fieldset>
+
+          <fieldset id="regulation-filters">
+            <legend>Regulation types</legend>
+          </fieldset>
+
+          <fieldset id="document-filters">
+            <legend>Documents</legend>
+          </fieldset>
+        </section>
+      </label><!-- tab-filters -->
+
+      <label>
+        <input id="tab-filters" type="radio" name="tab-selector" class="tab-selector">
+        <nav class="material-symbols-outlined">
+          ios_share
+        </nav>
+        <section class="sidebar-tab">
+          <h2>
+            Export
+          </h2>
+          <a href="#" id="download-json" download="graph.json">
+            Download JSON
+          </a>
+        </section>
+      </label><!-- tab-export -->
+
+      <label id="tab-close-button">
+        <input id="tab-close" type="radio" name="tab-selector" class="tab-selector">
+        <nav class="material-symbols-outlined">
+          close
+        </nav>
+      </label><!-- tab-close -->
+    </div><!-- .sidebar-buttons -->
+  </div><!-- .sidebar-wrapper -->
+  <main>
+    <svg id="graphsvg"></svg>
+    <div id="vis">
+      <div id="brat"/>
+    </div>
+  </main>
+{%- endblock %}

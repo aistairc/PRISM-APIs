@@ -334,6 +334,11 @@ def make_frontend(frontend_name, model):
     @frontend.route("/annotate", methods=["POST"])
     def annotate():
         text = request.form["text"]
-        return get_doc_data(text, model)
+        try:
+            data = get_doc_data(text, model)
+        except x:
+            logger.exception(x)
+            raise
+        return data
 
     return frontend

@@ -17,12 +17,9 @@ from loguru import logger
 from pydantic import Field, parse_obj_as
 from pydantic.dataclasses import dataclass
 
-import disease_network_generator_for_2d
-import disease_network_generator_for_3d
 from utils import file_utils
 
-# EXTERNAL_API_BASE_URL = os.environ["EXTERNAL_API_BASE_URL"]
-EXTERNAL_API_BASE_URL = "http://127.0.0.1:9091"
+EXTERNAL_API_BASE_URL = os.environ.get('EXTERNAL_API_BASE_URL', 'http://127.0.0.1:9091')
 
 # LOG_FILE = "logs/api.log"
 
@@ -291,13 +288,7 @@ class DiseaseNetworkDoc:
 @dataclass
 class DiseaseNetworkData:
     graph_data: List[dict] = Field(
-        ..., title="The graph data generated for the 2D and 3D Disease Network"
-    )
-    visualization_2d: Optional[str] = Field(
-        None, title="The 2D Disease Network visualization of the graph data"
-    )
-    visualization_3d: Optional[str] = Field(
-        None, title="The 3D Disease Network visualization of the graph data"
+        ..., title="The graph data generated for the Disease Network"
     )
 
 
@@ -559,6 +550,9 @@ def disease_network(
     if not verify_email(email):
         raise HTTPException(fastapi.status.HTTP_401_UNAUTHORIZED, "Not authenticated")
 
+    # TODO DRY it up, connect to disease_network_generator
+    raise NotImplementedError()
+
     max_args = 0
     all_events = []
 
@@ -703,8 +697,6 @@ def disease_network(
 
     return DiseaseNetworkData(
         graph_data=all_events,
-        visualization_2d=visualization_2d,
-        visualization_3d=visualization_3d,
     )
 
 

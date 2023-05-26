@@ -1,0 +1,13 @@
+#!/bin/bash
+# vim: ft=bash
+
+if [[ -z "$JOB_DIR" ]]
+then
+  JOB_DIR=./.cache/disease-network
+fi
+
+/usr/bin/find "$JOB_DIR" -name graph.json -type f -mtime +7 -print0 | while IFS= read -r -d '' file
+do
+  dir="$(dirname "$file")"
+  rm -r "$dir"
+done
